@@ -1,8 +1,11 @@
 # Resilience of Transportation Networks Under Failure Conditions
 
 **Course:** CSIS 385 – Design and Analysis of Algorithms, Spring 2026
-**Team Members:** Oliwia, Sean Donnelly
+
+**Team Members:** Oliwia Majtyka, Sean Donnelly
+
 **Submission Date:** April 1, 2026
+
 
 ---
 
