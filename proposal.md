@@ -73,6 +73,28 @@ analysis — constitute the scientific core of this project. Milestones 1 and 2 
 essential prerequisites, while Milestone 5 is required for a complete submission.
 
 ---
+## Progress Update April 10, 2026
+
+We started by parsing two different METAL road graphs, Siena 2 mile radius, and Siena 10 mile radius. 
+We implemented Dijkstra's algorithm to see how it works with different sized graphs with a fully working network.
+
+**2 Mile Radius:**
+
+This dataset had a total of 8 vertices and 6 edges. We found that from vertex 1 to vertex 7, it found the shortest
+path to have a distance of 3.730 using 3 hops. The shortest was from vertexes, (1,3,4,7). 
+
+**10 Mile Radius**
+
+This dataset had a total of 196 vertices and 240 edges. We found that from vertex 1 to vertex 195, it found 
+the shortest path to have a distance of 16.595 using 15 hops. The shortest was from vertexes,
+(1,41,43,70,76,77,119,118,130,153,137,151,150,152,163,195).
+
+**Road Failure Simulations**
+
+For our next progress update, we plan to start using other algorithms to see what happens when a road closes.
+We plan to see the paths get longer with more edges and vertices visited. We also want to see how big the effect is depending on which
+edge is removed. We also may change from a 2 mile radius to something bigger such as 3 miles to get a better idea of how the algorithm looks
+at the vertexes and edges.
 
 ## Feasibility
 
