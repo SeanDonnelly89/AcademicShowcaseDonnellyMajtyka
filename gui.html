@@ -2,976 +2,1118 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Network Resilience Analyzer — CSIS 385</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500&family=Fraunces:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0d0f;--bg2:#111417;--bg3:#181c20;--bg4:#1e2328;
-  --border:#2a3038;--border2:#3a424c;
-  --text:#e8eaed;--text2:#8c95a0;--text3:#5a6370;
-  --accent:#4ade80;--accent2:#22d3ee;--accent3:#f59e0b;--accent4:#f87171;--accent5:#a78bfa;
-  --mono:'DM Mono',monospace;--serif:'Playfair Display',serif;--sans:'DM Sans',sans-serif;
+  --bg:#060809;--s1:#0c1014;--s2:#121820;--s3:#1a2230;
+  --b0:#ffffff08;--b1:#ffffff10;--b2:#ffffff1a;--b3:#ffffff28;
+  --t1:#eef2f7;--t2:#7a8fa8;--t3:#3d4f63;
+  --g:#00e676;--g2:#00c853;--gd:rgba(0,230,118,0.08);
+  --c:#18e8ff;--cd:rgba(24,232,255,0.08);
+  --a:#ffab00;--ad:rgba(255,171,0,0.1);
+  --r:#ff4444;--rd:rgba(255,68,68,0.1);
+  --p:#b388ff;--pd:rgba(179,136,255,0.08);
+  --mono:'JetBrains Mono',monospace;
+  --serif:'Fraunces',serif;
+  --sans:'DM Sans',sans-serif;
 }
-html,body{height:100%;overflow:hidden}
-body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;display:flex;flex-direction:column}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:var(--sans);color:var(--t1);font-size:13px;display:flex;flex-direction:column}
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b2);border-radius:3px}
 
-/* ── Header ── */
-.header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.header-left{display:flex;align-items:center;gap:14px}
-.logo{width:34px;height:34px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.logo svg{width:19px;height:19px;stroke:#0a0d0f;fill:none;stroke-width:2.2}
-h1{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-0.3px}
-.header-meta{font-size:11px;color:var(--text3);margin-top:2px}
-.badge{font-size:10px;font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:3px 8px;color:var(--accent);white-space:nowrap}
-.status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:5px;animation:pulse 2.5s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+/* HEADER */
+.hdr{display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid var(--b1);flex-shrink:0;position:relative;z-index:10}
+.logo{width:32px;height:32px;border-radius:8px;background:conic-gradient(from 180deg,var(--g),var(--c),var(--g));display:flex;align-items:center;justify-content:center;flex-shrink:0;animation:spin 8s linear infinite}
+@keyframes spin{to{filter:hue-rotate(360deg)}}
+.logo svg{width:17px;height:17px;stroke:#060809;fill:none;stroke-width:2.5}
+.hdr-title{font-family:var(--serif);font-size:19px;font-style:italic;letter-spacing:-0.2px}
+.hdr-sub{font-size:10px;color:var(--t3);font-family:var(--mono);margin-top:1px}
+.pulse{width:5px;height:5px;border-radius:50%;background:var(--g);display:inline-block;margin-right:5px;animation:px 2s infinite}
+@keyframes px{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,230,118,.4)}50%{opacity:.4;box-shadow:0 0 0 4px rgba(0,230,118,0)}}
+.hdr-chips{margin-left:auto;display:flex;gap:7px;align-items:center}
+.chip{font-size:10px;font-family:var(--mono);background:var(--s2);border:1px solid var(--b2);border-radius:4px;padding:3px 9px;color:var(--t2);transition:.2s}
+.chip.g{color:var(--g);border-color:rgba(0,230,118,.25)}
+.chip.c{color:var(--c);border-color:rgba(24,232,255,.25)}
+.chip.a{color:var(--a);border-color:rgba(255,171,0,.25)}
 
-/* ── Layout ── */
-.main{display:grid;grid-template-columns:210px 1fr 230px;flex:1;min-height:0;overflow:hidden}
+/* LAYOUT */
+.wrap{display:grid;grid-template-columns:185px 1fr 215px;flex:1;min-height:0;overflow:hidden}
 
-/* ── Sidebar ── */
-.sidebar{border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
-.sidebar-label{font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.2px;text-transform:uppercase;margin:10px 2px 6px}
-.nav-item{padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:8px;transition:all 0.13s;border:1px solid transparent;user-select:none}
-.nav-item:hover{background:var(--bg3);color:var(--text)}
-.nav-item.active{background:var(--bg3);color:var(--accent);border-color:var(--border)}
-.nav-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
-.graph-btn{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text2);background:var(--bg2);border:1px solid var(--border);transition:all 0.13s;text-align:left;width:100%;margin-bottom:4px}
-.graph-btn:hover{border-color:var(--border2);color:var(--text)}
-.graph-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(74,222,128,0.06)}
-.graph-btn small{display:block;font-size:10px;color:var(--text3);margin-top:2px}
-.add-btn{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text3);background:transparent;border:1px dashed var(--border);transition:all 0.13s;text-align:left;width:100%;margin-top:2px}
-.add-btn:hover{border-color:var(--border2);color:var(--text2)}
-.sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
-.ask-btn{background:transparent;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text2);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.13s;font-family:var(--sans);width:100%;text-align:left}
-.ask-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(74,222,128,0.04)}
+/* SIDEBAR */
+.sb{border-right:1px solid var(--b0);padding:12px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto}
+.slbl{font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;padding:10px 6px 5px}
+.nav{padding:7px 10px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--t2);display:flex;align-items:center;gap:8px;border:1px solid transparent;transition:.12s;user-select:none}
+.nav:hover{background:var(--s2);color:var(--t1)}
+.nav.on{background:var(--s2);color:var(--g);border-color:rgba(0,230,118,.2)}
+.nav svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;flex-shrink:0;opacity:.7}
+.nav.on svg{opacity:1}
+.gb{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--t2);background:var(--s1);border:1px solid var(--b1);width:100%;text-align:left;margin-bottom:3px;transition:.12s}
+.gb:hover{border-color:var(--b2);color:var(--t1)}
+.gb.on{border-color:rgba(0,230,118,.3);color:var(--g);background:var(--gd)}
+.gb small{display:block;font-size:9px;color:var(--t3);margin-top:2px}
+.addbtn{padding:7px 10px;border-radius:7px;cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--t3);background:transparent;border:1px dashed var(--b1);width:100%;text-align:left;transition:.12s;margin-top:2px}
+.addbtn:hover{border-color:var(--b2);color:var(--t2)}
+.sb-foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--b0);display:flex;flex-direction:column;gap:4px}
+.abtn{background:transparent;border:1px solid var(--b1);border-radius:7px;padding:7px 10px;color:var(--t2);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:7px;transition:.12s;font-family:var(--sans);width:100%;text-align:left}
+.abtn:hover{border-color:var(--b2);color:var(--t1);background:var(--s2)}
+.abtn svg{width:12px;height:12px;stroke:currentColor;fill:none;flex-shrink:0}
+.abtn.danger{color:var(--r);border-color:rgba(255,68,68,.2)}
+.abtn.danger:hover{background:var(--rd);border-color:rgba(255,68,68,.4)}
+.abtn.active-anim{color:var(--a);border-color:rgba(255,171,0,.3);background:var(--ad)}
 
-/* ── Content area ── */
-.content{overflow:hidden;display:flex;flex-direction:column;min-height:0}
-.panel{display:none;flex-direction:column;height:100%;overflow:hidden}
-.panel.active{display:flex}
+/* CONTENT */
+.ct{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.pn{display:none;flex-direction:column;height:100%;overflow:hidden}
+.pn.on{display:flex}
 
-/* ── Graph panel ── */
-.graph-panel-inner{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;overflow:hidden}
-.graph-toolbar{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.toolbar-btn{padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--text2);background:var(--bg2);border:1px solid var(--border);transition:all 0.12s}
-.toolbar-btn:hover{border-color:var(--border2);color:var(--text)}
-.toolbar-btn.active{border-color:var(--accent2);color:var(--accent2)}
-.canvas-wrap{flex:1;min-height:0;position:relative}
-#netCanvas{width:100%;height:100%;border-radius:8px;background:var(--bg2);border:1px solid var(--border);display:block}
-.canvas-legend{position:absolute;bottom:10px;left:10px;display:flex;gap:12px}
-.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--mono)}
-.legend-dot{width:8px;height:8px;border-radius:50%}
+/* GRAPH PANEL */
+.gph{flex:1;display:flex;flex-direction:column;padding:12px;gap:10px;min-height:0}
+.toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.tbb{padding:4px 10px;border-radius:5px;cursor:pointer;font-size:10px;font-family:var(--mono);color:var(--t3);background:var(--s1);border:1px solid var(--b1);transition:.12s;letter-spacing:.3px;white-space:nowrap}
+.tbb:hover{color:var(--t2);border-color:var(--b2)}
+.tbb.on{color:var(--c);border-color:rgba(24,232,255,.3);background:var(--cd)}
+.tbb.danger.on{color:var(--r);border-color:rgba(255,68,68,.3);background:var(--rd)}
+.tsep{width:1px;height:14px;background:var(--b1)}
+.cbox{flex:1;min-height:0;position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--b1)}
+#gsvg{width:100%;height:100%;display:block}
+.cleg{position:absolute;bottom:10px;left:12px;display:flex;gap:12px;pointer-events:none}
+.leg{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--t3);font-family:var(--mono)}
+.ldot{width:6px;height:6px;border-radius:50%}
+.tip{position:absolute;background:rgba(12,16,20,.96);border:1px solid var(--b2);border-radius:8px;padding:8px 11px;font-size:10px;font-family:var(--mono);pointer-events:none;opacity:0;transition:opacity .1s;z-index:50;color:var(--t1);line-height:1.6;min-width:160px}
+.ginfo{position:absolute;top:10px;right:10px;background:rgba(12,16,20,.8);border:1px solid var(--b1);border-radius:7px;padding:7px 11px;font-size:10px;font-family:var(--mono);color:var(--t2);pointer-events:none;backdrop-filter:blur(6px)}
+.fail-counter{position:absolute;top:10px;left:50%;transform:translateX(-50%);background:rgba(255,68,68,.12);border:1px solid rgba(255,68,68,.3);border-radius:7px;padding:6px 16px;font-size:12px;font-family:var(--mono);color:var(--r);pointer-events:none;display:none;text-align:center}
 
-/* ── Algo panel ── */
-.algo-compare{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;height:100%}
-.section-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
-.section-title{font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.2px;text-transform:uppercase}
-.algo-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.algo-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px}
-.algo-card.winner{border-color:rgba(74,222,128,0.4);background:rgba(74,222,128,0.03)}
-.algo-name{font-size:14px;font-weight:500;margin-bottom:3px;display:flex;align-items:center;gap:8px}
-.algo-sub{font-size:10px;color:var(--text3);margin-bottom:12px;font-family:var(--mono)}
-.algo-tag{font-size:9px;font-family:var(--mono);background:var(--bg3);border-radius:3px;padding:2px 5px;color:var(--text3)}
-.algo-tag.win{background:rgba(74,222,128,0.15);color:var(--accent)}
-.metric-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
-.metric-row:last-child{border-bottom:none}
-.metric-label{font-size:11px;color:var(--text2)}
-.metric-val{font-family:var(--mono);font-size:12px;color:var(--text)}
-.metric-val.better{color:var(--accent)}
-.metric-val.same{color:var(--text3)}
-.path-viz{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:13px}
-.path-nodes{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
-.path-node{font-size:10px;font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:2px 6px;color:var(--accent2)}
-.path-arrow{color:var(--text3);font-size:10px}
-.eff-bar-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:13px}
-.eff-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
-.eff-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 0.7s cubic-bezier(0.4,0,0.2,1)}
+/* ALGO PANEL */
+.algo-inner{padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:100%}
+.shdr{display:flex;align-items:baseline;justify-content:space-between}
+.stitle{font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:1.3px;text-transform:uppercase}
+.acards{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.acard{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px}
+.acard.win{border-color:rgba(0,230,118,.25);background:var(--gd)}
+.aname{font-size:13px;font-weight:500;display:flex;align-items:center;gap:7px;margin-bottom:2px}
+.adesc{font-size:9px;color:var(--t3);font-family:var(--mono);margin-bottom:10px}
+.atag{font-size:9px;font-family:var(--mono);background:var(--s2);border-radius:3px;padding:2px 5px;color:var(--t3)}
+.atag.win{background:var(--gd);color:var(--g)}
+.mr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--b0)}
+.mr:last-child{border-bottom:none}
+.ml{font-size:11px;color:var(--t2)}
+.mv{font-family:var(--mono);font-size:11px}
+.mv.better{color:var(--g)}.mv.same{color:var(--t3)}.mv.c{color:var(--c)}
+.pbox{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:12px}
+.plbl{font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px}
+.pnodes{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.pn2{font-size:9px;font-family:var(--mono);background:var(--s2);border:1px solid var(--b1);border-radius:3px;padding:2px 5px;color:var(--c)}
+.parr{color:var(--t3);font-size:9px}
+.eff-box{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px}
+.erow{display:flex;align-items:center;gap:10px}
+.etrack{flex:1;height:6px;background:var(--s3);border-radius:3px;overflow:hidden}
+.efill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--g),var(--c));transition:width .9s cubic-bezier(.4,0,.2,1)}
+.enum{font-family:var(--mono);font-size:18px;color:var(--g);min-width:52px;text-align:right}
+.esub{font-size:10px;color:var(--t3);margin-top:5px}
 
-/* ── Failure panel ── */
-.failure-inner{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;height:100%}
-.sim-controls{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
-.sim-controls label{font-size:11px;color:var(--text2);white-space:nowrap}
-.sim-controls input[type=range]{flex:1;accent-color:var(--accent);cursor:pointer}
-.sim-step-val{font-family:var(--mono);font-size:13px;color:var(--accent);min-width:30px;text-align:right}
-.sim-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:auto;flex-shrink:0}
-table{width:100%;border-collapse:collapse;font-size:12px}
-th{padding:9px 12px;text-align:left;font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
-td{padding:8px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);color:var(--text2)}
+/* FAILURE PANEL */
+.fi{padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:100%}
+.sbox{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:11px;display:flex;align-items:center;gap:10px}
+.sbox label{font-size:10px;color:var(--t2);white-space:nowrap;font-family:var(--mono)}
+.sbox input[type=range]{flex:1;-webkit-appearance:none;height:3px;border-radius:2px;background:var(--s3);outline:none;cursor:pointer}
+.sbox input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;background:var(--g);cursor:pointer;border:2px solid var(--bg);box-shadow:0 0 0 2px rgba(0,230,118,.25)}
+.sv2{font-family:var(--mono);font-size:11px;color:var(--g);min-width:70px;text-align:right}
+.ftable{background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:auto;max-height:220px}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{padding:8px 10px;text-align:left;font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:.8px;text-transform:uppercase;border-bottom:1px solid var(--b1);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--b0);font-family:var(--mono);color:var(--t2)}
 tr:last-child td{border-bottom:none}
-tr.row-baseline td{color:var(--text3)}
-tr.row-ok td{color:var(--text)}
-tr.row-disc td{color:var(--accent4)}
-tr.row-current{background:rgba(74,222,128,0.05)}
-tr.row-current td{color:var(--accent)}
-.tag-ok{color:var(--accent);font-size:9px}
-.tag-disc{color:var(--accent4);font-size:9px}
-.chart-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;flex-shrink:0}
-.chart-label{font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px}
-#failCanvas{width:100%;display:block;border-radius:4px}
+tr.base td{color:var(--t3)}
+tr.cur{background:rgba(0,230,118,.05)}
+tr.cur td{color:var(--g)}
+tr.disc td{color:var(--r)}
+.otag{color:var(--g);font-size:9px}.dtag{color:var(--r);font-size:9px}
+.cbox2{background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:13px}
+.clbl{font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px}
+#fchart{width:100%;display:block}
+.ins{border-radius:10px;padding:12px 13px;font-size:12px;color:var(--t2);line-height:1.6}
+.ins.w{background:var(--ad);border:1px solid rgba(255,171,0,.2)}
+.ins.i{background:var(--cd);border:1px solid rgba(24,232,255,.15)}
+.ins strong{color:var(--a)}.ins.i strong{color:var(--c)}
 
-/* ── Criticality panel ── */
-.crit-inner{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;height:100%}
-.crit-list{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
-.crit-item{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background 0.12s}
-.crit-item:hover{background:var(--bg3)}
-.crit-item:last-child{border-bottom:none}
-.crit-rank{font-family:var(--mono);font-size:11px;color:var(--text3);width:18px;text-align:right;flex-shrink:0}
-.crit-road{font-family:var(--mono);font-size:11px;color:var(--accent3);flex-shrink:0;width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.crit-bar-bg{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
-.crit-bar-fill{height:100%;border-radius:3px;transition:width 0.5s}
-.crit-score{font-family:var(--mono);font-size:11px;color:var(--text2);width:50px;text-align:right;flex-shrink:0}
-.crit-disc{font-size:10px;color:var(--accent4);font-family:var(--mono);flex-shrink:0;width:30px;text-align:right}
-.bridge-box{background:rgba(248,113,113,0.05);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)}
-.bridge-box-title{color:var(--accent4);font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
-.bridge-list{display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:160px;overflow-y:auto}
-.bridge-row{font-size:11px;font-family:var(--mono);color:var(--text2);padding:4px 0;border-bottom:1px solid rgba(248,113,113,0.1);display:flex;justify-content:space-between}
-.bridge-row:last-child{border-bottom:none}
+/* CRIT PANEL */
+.ci{padding:16px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;height:100%}
+.crow{padding:9px 13px;border-bottom:1px solid var(--b0);display:grid;grid-template-columns:20px 85px 1fr 48px 34px;align-items:center;gap:7px;cursor:pointer;transition:.1s}
+.crow:hover{background:var(--s2)}
+.crow:last-child{border-bottom:none}
+.cr{font-family:var(--mono);font-size:10px;color:var(--t3);text-align:right}
+.cro{font-family:var(--mono);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbg{height:4px;background:var(--s3);border-radius:2px;overflow:hidden}
+.cfill{height:100%;border-radius:2px;transition:width .5s}
+.csc{font-family:var(--mono);font-size:10px;color:var(--t2);text-align:right}
+.cdc{font-size:9px;font-family:var(--mono);text-align:right}
+.brbox{background:var(--rd);border:1px solid rgba(255,68,68,.15);border-radius:10px;padding:12px}
+.brtitle{font-size:9px;color:var(--r);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+.brrow{font-size:10px;font-family:var(--mono);color:var(--t2);padding:4px 0;border-bottom:1px solid rgba(255,68,68,.1);display:flex;justify-content:space-between;gap:8px}
+.brrow:last-child{border-bottom:none}
 
-/* ── Right panel ── */
-.right-panel{border-left:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
-.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
-.stat-label{font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px}
-.stat-value{font-size:22px;font-weight:500;font-family:var(--mono)}
-.stat-value.green{color:var(--accent)}
-.stat-value.amber{color:var(--accent3)}
-.stat-value.red{color:var(--accent4)}
-.stat-value.blue{color:var(--accent2)}
-.stat-sub{font-size:10px;color:var(--text3);margin-top:2px}
-.mini-bar{margin-top:7px}
-.mini-bar-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:3px}
-.mini-bar-bg{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
-.mini-bar-fill{height:100%;border-radius:2px;transition:width 0.5s}
-.log-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;flex:1;overflow-y:auto;min-height:80px}
-.log-line{font-size:10px;font-family:var(--mono);padding:1px 0;line-height:1.7}
-.log-line.ok{color:var(--accent)}
-.log-line.warn{color:var(--accent3)}
-.log-line.err{color:var(--accent4)}
-.log-line.info{color:var(--accent2)}
-.log-line.muted{color:var(--text3)}
+/* RIGHT PANEL */
+.rp{border-left:1px solid var(--b0);padding:12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.rlbl{font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:1.3px;text-transform:uppercase;padding:3px 0 1px}
+.sc{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:10px 12px}
+.sl{font-size:9px;font-family:var(--mono);color:var(--t3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:4px}
+.sv{font-size:20px;font-weight:400;font-family:var(--mono)}
+.sv.g{color:var(--g)}.sv.c{color:var(--c)}.sv.a{color:var(--a)}.sv.r{color:var(--r)}
+.ss{font-size:10px;color:var(--t3);margin-top:1px}
+.mb{margin-top:6px}
+.mblbls{display:flex;justify-content:space-between;font-size:9px;color:var(--t3);margin-bottom:3px}
+.mbbg{height:3px;background:var(--s3);border-radius:2px;overflow:hidden}
+.mbfill{height:100%;border-radius:2px;transition:width .5s}
+.logbox{background:var(--s1);border:1px solid var(--b1);border-radius:8px;padding:8px;flex:1;overflow-y:auto;min-height:60px}
+.ll{font-size:9px;font-family:var(--mono);padding:1px 0;line-height:1.8;display:flex;gap:5px}
+.lt{color:var(--t3);flex-shrink:0}
+.lm.g{color:var(--g)}.lm.c{color:var(--c)}.lm.a{color:var(--a)}.lm.r{color:var(--r)}.lm.d{color:var(--t3)}
 
-/* ── Modal for adding graphs ── */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:100}
-.modal-bg.open{display:flex}
-.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:500px;max-width:90vw}
-.modal h2{font-family:var(--serif);font-size:18px;margin-bottom:6px}
-.modal p{font-size:12px;color:var(--text2);margin-bottom:16px}
-.modal textarea{width:100%;height:200px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px;font-family:var(--mono);font-size:11px;color:var(--text);resize:vertical;margin-bottom:4px}
-.modal input[type=text]{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:12px;color:var(--text);margin-bottom:12px}
-.modal-btns{display:flex;gap:8px;justify-content:flex-end}
-.modal-btn{padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-family:var(--sans);border:1px solid var(--border2);background:transparent;color:var(--text2);transition:all 0.13s}
-.modal-btn.primary{background:var(--accent);color:#0a0d0f;border-color:var(--accent);font-weight:500}
-.modal-btn:hover{background:var(--bg3)}
-.modal-btn.primary:hover{background:#22c55e}
+/* MODAL */
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.8);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(4px)}
+.mbg.open{display:flex}
+.modal{background:var(--s1);border:1px solid var(--b2);border-radius:12px;padding:22px;width:500px;max-width:92vw}
+.modal h2{font-family:var(--serif);font-size:19px;font-style:italic;margin-bottom:5px}
+.modal p{font-size:11px;color:var(--t2);margin-bottom:12px;line-height:1.5}
+.modal input,.modal textarea{width:100%;background:var(--bg);border:1px solid var(--b2);border-radius:7px;padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--t1);margin-bottom:8px;outline:none;transition:.12s}
+.modal input:focus,.modal textarea:focus{border-color:rgba(0,230,118,.3)}
+.modal textarea{height:170px;resize:vertical}
+.mst{font-size:10px;font-family:var(--mono);min-height:14px;margin-bottom:8px}
+.mbtns{display:flex;gap:7px;justify-content:flex-end}
+.mb2{padding:7px 16px;border-radius:7px;cursor:pointer;font-size:12px;border:1px solid var(--b2);background:transparent;color:var(--t2);transition:.12s}
+.mb2:hover{background:var(--s2);color:var(--t1)}
+.mb2.p{background:var(--g);color:var(--bg);border-color:var(--g);font-weight:500}
+.mb2.p:hover{background:var(--g2)}
 
-/* ── Edge removal animation ── */
-.removal-flash{animation:flash 0.4s ease}
-@keyframes flash{0%{opacity:1}50%{opacity:0.2}100%{opacity:1}}
+/* PARTICLE CANVAS */
+#particles{position:fixed;inset:0;pointer-events:none;z-index:1}
 </style>
 </head>
 <body>
 
-<!-- Header -->
-<div class="header">
-  <div class="header-left">
-    <div class="logo">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="9.2" y2="9.2"/><line x1="14.8" y1="14.8" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="14.8" y2="9.2"/><line x1="9.2" y1="14.8" x2="5.6" y2="18.4"/></svg>
-    </div>
-    <div>
-      <h1>Network Resilience Analyzer</h1>
-      <div class="header-meta"><span class="status-dot"></span>CSIS 385 &mdash; Donnelly &amp; Majtyka &mdash; Spring 2026 &mdash; METAL Dataset</div>
-    </div>
+<canvas id="particles"></canvas>
+
+<div class="hdr">
+  <div class="logo">
+    <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
   </div>
-  <div style="display:flex;gap:8px;align-items:center">
-    <span class="badge" id="graph-badge">2mi &middot; 8V &middot; 6E</span>
-    <span class="badge" style="color:var(--accent2)" id="path-badge">path: 4.953mi &middot; 5 hops</span>
+  <div>
+    <div class="hdr-title">Network Resilience Analyzer</div>
+    <div class="hdr-sub"><span class="pulse"></span>CSIS 385 &nbsp;·&nbsp; Donnelly &amp; Majtyka &nbsp;·&nbsp; Spring 2026 &nbsp;·&nbsp; METAL Dataset</div>
+  </div>
+  <div class="hdr-chips">
+    <span class="chip g" id="chip-g">siena-2mi · 8V · 6E</span>
+    <span class="chip c" id="chip-p">path 4.953mi · 5 hops</span>
+    <span class="chip a" id="chip-e">A* 0% gain</span>
   </div>
 </div>
 
-<!-- Main layout -->
-<div class="main">
-
-  <!-- Sidebar -->
-  <div class="sidebar">
-    <div class="sidebar-label">Analysis</div>
-    <div class="nav-item active" onclick="switchPanel('graph')"><span class="nav-dot"></span>Network graph</div>
-    <div class="nav-item" onclick="switchPanel('algo')"><span class="nav-dot"></span>Algorithm comparison</div>
-    <div class="nav-item" onclick="switchPanel('failure')"><span class="nav-dot"></span>Failure simulation</div>
-    <div class="nav-item" onclick="switchPanel('crit')"><span class="nav-dot"></span>Criticality ranking</div>
-
-    <div class="sidebar-label">Datasets</div>
-    <div id="graphButtons"></div>
-    <button class="add-btn" onclick="openModal()">+ add graph&hellip;</button>
-
-    <div class="sidebar-footer">
-      <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:2px">Quick actions</div>
-      <button class="ask-btn" onclick="animateEdgeRemoval()">▶ animate removal</button>
-      <button class="ask-btn" onclick="toggleShowAllLabels()">◈ toggle labels</button>
-      <button class="ask-btn" onclick="exportResults()">↓ export results</button>
-    </div>
+<div class="wrap">
+<div class="sb">
+  <div class="slbl">Analysis</div>
+  <div class="nav on" onclick="go('graph')"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>Network graph</div>
+  <div class="nav" onclick="go('algo')"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Algorithm compare</div>
+  <div class="nav" onclick="go('fail')"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>Failure simulation</div>
+  <div class="nav" onclick="go('crit')"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Criticality ranking</div>
+  <div class="slbl">Datasets</div>
+  <div id="gbtns"></div>
+  <button class="addbtn" onclick="openModal()">＋ add graph…</button>
+  <div class="sb-foot">
+    <button class="abtn" id="animBtn" onclick="startAnim()"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>animate failures</button>
+    <button class="abtn danger" id="randBtn" onclick="randomFailure()"><svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>random failure!</button>
+    <button class="abtn" onclick="resetGraph()"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.16"/></svg>reset network</button>
+    <button class="abtn" onclick="toggleLbls()"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>toggle labels</button>
+    <button class="abtn" onclick="exportTxt()"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>export results</button>
   </div>
-
-  <!-- Content -->
-  <div class="content">
-
-    <!-- Graph panel -->
-    <div class="panel active" id="panel-graph">
-      <div class="graph-panel-inner">
-        <div class="graph-toolbar">
-          <span style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase">View</span>
-          <div class="toolbar-btn active" id="btn-path" onclick="setView('path',this)">shortest path</div>
-          <div class="toolbar-btn" id="btn-all" onclick="setView('all',this)">all edges</div>
-          <div class="toolbar-btn" id="btn-crit" onclick="setView('crit',this)">critical edges</div>
-          <div class="toolbar-btn" id="btn-failure" onclick="setView('failure',this)">post-failure</div>
-          <span style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)" id="graph-desc">intact network</span>
-        </div>
-        <div class="canvas-wrap">
-          <canvas id="netCanvas"></canvas>
-          <div class="canvas-legend">
-            <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>source/target</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>path node</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>critical edge</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--border2)"></div>inactive</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Algo panel -->
-    <div class="panel" id="panel-algo">
-      <div class="algo-compare">
-        <div class="section-header">
-          <span class="section-title">Algorithm Comparison &mdash; intact network</span>
-          <span style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="algo-graph-label"></span>
-        </div>
-        <div class="algo-cards">
-          <div class="algo-card">
-            <div class="algo-name">Dijkstra's <span class="algo-tag">Baseline</span></div>
-            <div class="algo-sub">Explores all nodes uniformly &middot; O((V+E) log V)</div>
-            <div class="metric-row"><span class="metric-label">Distance</span><span class="metric-val" id="d-dist">—</span></div>
-            <div class="metric-row"><span class="metric-label">Hops</span><span class="metric-val" id="d-hops">—</span></div>
-            <div class="metric-row"><span class="metric-label">Nodes visited</span><span class="metric-val" id="d-visited">—</span></div>
-            <div class="metric-row"><span class="metric-label">Heuristic</span><span class="metric-val" style="color:var(--text3)">none</span></div>
-          </div>
-          <div class="algo-card winner">
-            <div class="algo-name">A* Search <span class="algo-tag win" id="astar-tag">—</span></div>
-            <div class="algo-sub">Geographic heuristic (Haversine) &middot; prunes search space</div>
-            <div class="metric-row"><span class="metric-label">Distance</span><span class="metric-val" id="a-dist">—</span></div>
-            <div class="metric-row"><span class="metric-label">Hops</span><span class="metric-val" id="a-hops">—</span></div>
-            <div class="metric-row"><span class="metric-label">Nodes visited</span><span class="metric-val better" id="a-visited">—</span></div>
-            <div class="metric-row"><span class="metric-label">Heuristic</span><span class="metric-val" style="color:var(--accent2)">Haversine distance</span></div>
-          </div>
-        </div>
-        <div class="path-viz">
-          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px">Shortest path &mdash; vertex sequence</div>
-          <div class="path-nodes" id="path-display"></div>
-        </div>
-        <div class="eff-bar-wrap">
-          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px">Nodes explored &mdash; A* vs Dijkstra</div>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="eff-track"><div class="eff-fill" id="eff-bar" style="width:0%"></div></div>
-            <span id="eff-pct" style="font-family:var(--mono);font-size:16px;color:var(--accent);min-width:50px;text-align:right">0%</span>
-          </div>
-          <div style="font-size:11px;color:var(--text3);margin-top:6px" id="eff-note">fewer nodes explored by A* vs Dijkstra</div>
-        </div>
-        <!-- Per-failure algo comparison -->
-        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:13px">
-          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">A* heuristic degradation under failure</div>
-          <div id="failure-algo-rows" style="display:flex;flex-direction:column;gap:6px"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Failure simulation panel -->
-    <div class="panel" id="panel-failure">
-      <div class="failure-inner">
-        <div class="section-header">
-          <span class="section-title">Progressive Edge Failure Simulation</span>
-        </div>
-        <div class="sim-controls">
-          <label>Removal step</label>
-          <input type="range" min="0" id="simSlider" value="0" oninput="updateSim(this.value)">
-          <span class="sim-step-val" id="simStepVal">baseline</span>
-        </div>
-        <div class="sim-table-wrap">
-          <table>
-            <thead><tr><th>#</th><th>Edge removed</th><th>Road</th><th>Dijkstra dist</th><th>&Delta; dist</th><th>A* visited</th><th>D visited</th><th>Status</th></tr></thead>
-            <tbody id="simTbody"></tbody>
-          </table>
-        </div>
-        <div class="chart-wrap">
-          <div class="chart-label">Distance increase over baseline (miles)</div>
-          <canvas id="failCanvas" height="90"></canvas>
-        </div>
-        <div id="failure-insight" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)"></div>
-      </div>
-    </div>
-
-    <!-- Criticality panel -->
-    <div class="panel" id="panel-crit">
-      <div class="crit-inner">
-        <div class="section-header">
-          <span class="section-title">Edge Criticality Ranking</span>
-          <span style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="crit-label"></span>
-        </div>
-        <div class="crit-list" id="critList"></div>
-        <div class="bridge-box">
-          <div class="bridge-box-title">Bridge Edges &mdash; removal disconnects network</div>
-          <div id="bridge-desc" style="font-size:12px;color:var(--text2)"></div>
-          <div class="bridge-list" id="bridge-list"></div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- Right panel -->
-  <div class="right-panel">
-    <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase">Network stats</div>
-    <div class="stat-card">
-      <div class="stat-label">Vertices</div>
-      <div class="stat-value green" id="stat-v">—</div>
-      <div class="stat-sub">road intersections</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Edges</div>
-      <div class="stat-value blue" id="stat-e">—</div>
-      <div class="stat-sub">road segments</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Bridge edges</div>
-      <div class="stat-value red" id="stat-b">—</div>
-      <div class="stat-sub">cause disconnection if removed</div>
-      <div class="mini-bar">
-        <div class="mini-bar-labels"><span>of total edges</span><span id="bridge-pct">—</span></div>
-        <div class="mini-bar-bg"><div class="mini-bar-fill" id="bridge-bar" style="width:0%;background:var(--accent4)"></div></div>
-      </div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">A* efficiency</div>
-      <div class="stat-value amber" id="stat-eff">—</div>
-      <div class="stat-sub">fewer nodes explored vs Dijkstra</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-label">Most critical road</div>
-      <div style="font-family:var(--mono);font-size:13px;color:var(--accent3);margin-top:4px" id="stat-crit">—</div>
-      <div class="stat-sub" id="stat-crit-sub">—</div>
-    </div>
-    <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-top:2px">Activity log</div>
-    <div class="log-box" id="logBox"></div>
-  </div>
-
 </div>
 
-<!-- Add graph modal -->
-<div class="modal-bg" id="modalBg" onclick="e=>{if(e.target===this)closeModal()}">
+<div class="ct">
+  <!-- Graph -->
+  <div class="pn on" id="pn-graph">
+    <div class="gph">
+      <div class="toolbar">
+        <span style="font-size:9px;color:var(--t3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase">View</span>
+        <div class="tbb on" id="vb-path" onclick="setView('path',this)">shortest path</div>
+        <div class="tbb" id="vb-all" onclick="setView('all',this)">all edges</div>
+        <div class="tbb" id="vb-crit" onclick="setView('crit',this)">critical</div>
+        <div class="tsep"></div>
+        <div class="tbb danger" id="vb-click" onclick="toggleClickRemove()">click-to-remove: off</div>
+        <span style="margin-left:auto;font-size:10px;color:var(--t3);font-family:var(--mono)" id="vdesc">intact network</span>
+      </div>
+      <div class="cbox" id="cbox">
+        <svg id="gsvg"></svg>
+        <div class="ginfo" id="ginfo">hover for details</div>
+        <div class="tip" id="tip"></div>
+        <div class="fail-counter" id="failctr"></div>
+        <div class="cleg">
+          <div class="leg"><div class="ldot" style="background:var(--g)"></div>source/target</div>
+          <div class="leg"><div class="ldot" style="background:var(--c)"></div>path node</div>
+          <div class="leg"><div class="ldot" style="background:var(--r)"></div>critical edge</div>
+          <div class="leg"><div class="ldot" style="background:var(--b2)"></div>inactive</div>
+          <div class="leg"><div class="ldot" style="background:rgba(255,68,68,.3)"></div>removed</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Algo -->
+  <div class="pn" id="pn-algo">
+    <div class="algo-inner">
+      <div class="shdr"><span class="stitle">Algorithm comparison — intact network</span><span style="font-size:10px;color:var(--t3);font-family:var(--mono)" id="albl"></span></div>
+      <div class="acards">
+        <div class="acard">
+          <div class="aname">Dijkstra's <span class="atag">baseline</span></div>
+          <div class="adesc">uniform-cost · O((V+E) log V) · no heuristic</div>
+          <div class="mr"><span class="ml">Distance</span><span class="mv" id="dd">—</span></div>
+          <div class="mr"><span class="ml">Hops</span><span class="mv" id="dh">—</span></div>
+          <div class="mr"><span class="ml">Nodes visited</span><span class="mv" id="dv">—</span></div>
+          <div class="mr"><span class="ml">Heuristic</span><span class="mv same">none</span></div>
+        </div>
+        <div class="acard win">
+          <div class="aname">A* Search <span class="atag win" id="atag">—</span></div>
+          <div class="adesc">Haversine heuristic · admissible · prunes space</div>
+          <div class="mr"><span class="ml">Distance</span><span class="mv" id="ad">—</span></div>
+          <div class="mr"><span class="ml">Hops</span><span class="mv" id="ah">—</span></div>
+          <div class="mr"><span class="ml">Nodes visited</span><span class="mv better" id="av">—</span></div>
+          <div class="mr"><span class="ml">Heuristic</span><span class="mv c">Haversine dist.</span></div>
+        </div>
+      </div>
+      <div class="pbox">
+        <div class="plbl">Shortest path — vertex sequence</div>
+        <div class="pnodes" id="pdisp"></div>
+      </div>
+      <div class="eff-box">
+        <div class="stitle" style="margin-bottom:10px">efficiency gain — nodes explored</div>
+        <div class="erow">
+          <div class="etrack"><div class="efill" id="efill" style="width:0%"></div></div>
+          <div class="enum" id="enum">0%</div>
+        </div>
+        <div class="esub" id="esub">—</div>
+      </div>
+      <div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;padding:12px">
+        <div class="stitle" style="margin-bottom:10px">A* heuristic degradation under failure</div>
+        <div id="drows"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Failure -->
+  <div class="pn" id="pn-fail">
+    <div class="fi">
+      <div class="shdr"><span class="stitle">Progressive edge failure simulation</span></div>
+      <div class="sbox">
+        <label>Step</label>
+        <input type="range" min="0" id="simSlider" value="0" oninput="updSim(+this.value)">
+        <span class="sv2" id="stepv">baseline</span>
+      </div>
+      <div class="ftable"><table>
+        <thead><tr><th>#</th><th>Road</th><th>Edge</th><th>D dist</th><th>Δ mi</th><th>D vis</th><th>A* vis</th><th>Status</th></tr></thead>
+        <tbody id="sbody"></tbody>
+      </table></div>
+      <div class="cbox2">
+        <div class="clbl">Distance increase over baseline (miles)</div>
+        <svg id="fchart" height="95"></svg>
+      </div>
+      <div class="ins" id="ins"></div>
+    </div>
+  </div>
+
+  <!-- Crit -->
+  <div class="pn" id="pn-crit">
+    <div class="ci">
+      <div class="shdr"><span class="stitle">Edge criticality ranking</span><span style="font-size:10px;color:var(--t3);font-family:var(--mono)" id="clbl"></span></div>
+      <div style="background:var(--s1);border:1px solid var(--b1);border-radius:10px;overflow:hidden" id="critList"></div>
+      <div class="brbox">
+        <div class="brtitle">Bridge edges — removal disconnects network</div>
+        <div id="brrows"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="rp">
+  <div class="rlbl">Network</div>
+  <div class="sc"><div class="sl">Vertices</div><div class="sv g" id="sv">—</div><div class="ss">intersections</div></div>
+  <div class="sc"><div class="sl">Edges</div><div class="sv c" id="se">—</div><div class="ss">road segments</div></div>
+  <div class="sc">
+    <div class="sl">Bridges</div><div class="sv r" id="sb">—</div><div class="ss">cause disconnection</div>
+    <div class="mb">
+      <div class="mblbls"><span>% of edges</span><span id="bpct">—</span></div>
+      <div class="mbbg"><div class="mbfill" id="bbar" style="width:0%;background:var(--r)"></div></div>
+    </div>
+  </div>
+  <div class="sc"><div class="sl">A* efficiency</div><div class="sv a" id="seff">—</div><div class="ss">nodes saved</div></div>
+  <div class="sc">
+    <div class="sl">Most critical</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--a);margin-top:3px" id="scrit">—</div>
+    <div class="ss" id="scritp">—</div>
+  </div>
+  <div class="sc">
+    <div class="sl">Failures today</div>
+    <div class="sv r" id="sfail">0</div>
+    <div class="ss">edges removed this session</div>
+  </div>
+  <div class="rlbl" style="margin-top:2px">Log</div>
+  <div class="logbox" id="logbox"></div>
+</div>
+</div>
+
+<div class="mbg" id="mbg">
   <div class="modal" onclick="event.stopPropagation()">
     <h2>Add graph dataset</h2>
-    <p>Paste your Java program output below. The dashboard will parse the results automatically.</p>
-    <input type="text" id="modalName" placeholder="Graph name (e.g. siena-3mi)">
-    <textarea id="modalOutput" placeholder="Paste Java output here...&#10;&#10;Example:&#10;Loaded: Graph(196 vertices, 240 edges)&#10;Distance : 18.074 miles&#10;Hops     : 19&#10;Visited  : 172 nodes&#10;..."></textarea>
-    <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:12px" id="modal-status"></div>
-    <div class="modal-btns">
-      <button class="modal-btn" onclick="closeModal()">Cancel</button>
-      <button class="modal-btn primary" onclick="parseAndAddGraph()">Add graph</button>
+    <p>Paste your Java output. The dashboard auto-parses V, E, path, distances, visited counts, and criticality scores.</p>
+    <input type="text" id="mname" placeholder="Graph name (e.g. siena-3mi)">
+    <textarea id="mout" placeholder="Paste Java output here…"></textarea>
+    <div class="mst" id="mst"></div>
+    <div class="mbtns">
+      <button class="mb2" onclick="closeModal()">Cancel</button>
+      <button class="mb2 p" onclick="parseAdd()">Add graph</button>
     </div>
   </div>
 </div>
 
 <script>
-// ─── Data ──────────────────────────────────────────────────────────────────────
-const GRAPHS = [
-  {
-    name:'siena-2mi',
-    V:8, E:6, bridges:6,
-    vertices:[
-      {id:0,label:'NY2@DelRd',x:420,y:80},
-      {id:1,label:'NY155@DelRd',x:320,y:145},
-      {id:2,label:'NY155@LinAve',x:220,y:200},
-      {id:3,label:'NY155/US9',x:145,y:130},
-      {id:4,label:'US9@FidLn',x:110,y:240},
-      {id:5,label:'NY377/NY378',x:215,y:340},
-      {id:6,label:'NY378@MenRd',x:310,y:395},
-      {id:7,label:'NY378/US9',x:120,y:320}
-    ],
-    edges:[
-      {u:7,v:4,road:'US9',w:1.069},{u:4,v:3,road:'US9',w:1.186},
-      {u:3,v:1,road:'NY155',w:1.393},{u:1,v:2,road:'NY155',w:1.207},
-      {u:7,v:5,road:'NY378',w:0.915},{u:5,v:6,road:'NY378',w:0.390}
-    ],
-    path:[1,3,4,7,5,6],
-    source:1, target:6,
-    dijk:{dist:4.953,hops:5,visited:7},
-    astar:{dist:4.953,hops:5,visited:7},
-    simSteps:[
-      {edge:{u:3,v:1},road:'NY155',dist:null,delta:null,dVisited:null,aVisited:null,status:'DISCONNECTED'}
-    ],
-    crit:[
-      {road:'US9',from:'US9@FidLn',to:'NY155/US9',score:24000,disc:24},
-      {road:'US9',from:'NY378/US9',to:'US9@FidLn',score:24000,disc:24},
-      {road:'NY155',from:'NY155/US9',to:'NY155@DelRd',score:20000,disc:20},
-      {road:'NY378',from:'NY378/US9',to:'NY377/NY378',score:20000,disc:20},
-      {road:'NY155',from:'NY155@DelRd',to:'NY155@LinAve',score:12000,disc:12},
-      {road:'NY378',from:'NY377/NY378',to:'NY378@MenRd',score:12000,disc:12}
-    ]
-  },
-  {
-    name:'siena-10mi',
-    V:196, E:240, bridges:14,
-    vertices:[
-      {id:0,label:'NY40@FogRd',x:470,y:30},
-      {id:18,label:'NY40@CR116',x:440,y:60},
-      {id:33,label:'NY40_N/NY142_S',x:400,y:85},
-      {id:32,label:'NY40_S/NY142_N',x:390,y:90},
-      {id:57,label:'NY7/NY40',x:355,y:125},
-      {id:49,label:'I-787/NY7@8thSt',x:310,y:175},
-      {id:47,label:'I-787/NY7@6thAve',x:305,y:185},
-      {id:50,label:'I-787(9)/NY7/NY787',x:290,y:210},
-      {id:48,label:'I-787@8',x:300,y:225},
-      {id:92,label:'I-787(7)/NY378',x:265,y:255},
-      {id:91,label:'I-787@6',x:275,y:270},
-      {id:121,label:'I-90@6A&I-787@5',x:255,y:305},
-      {id:130,label:'I-90(6)/US9',x:230,y:335},
-      {id:153,label:'US9/US9W',x:205,y:360},
-      {id:137,label:'NY5/US9W',x:185,y:385},
-      {id:151,label:'US20/NY443/US9W',x:170,y:405},
-      {id:150,label:'NY443/US9W@MorAve',x:155,y:425},
-      {id:152,label:'NY443_W/US9W',x:140,y:445},
-      {id:163,label:'NY335/NY443',x:120,y:465},
-      {id:195,label:'NY140/NY443',x:100,y:490},
-      // extra nodes for visual density
-      {id:1,label:'I-87@8',x:100,y:30},{id:2,label:'I-87@8A',x:85,y:15},
-      {id:7,label:'NY236@CR95',x:300,y:30},{id:8,label:'NY236/US9',x:240,y:50},
-      {id:10,label:'US9@CohCreRd',x:245,y:85},{id:11,label:'US9@VisFerRd',x:240,y:70},
-      {id:41,label:'I-87(7)/NY7',x:100,y:140},{id:43,label:'NY7/US9',x:160,y:150},
-      {id:100,label:'NY136/US4',x:380,y:320},{id:95,label:'NY32/NY378',x:330,y:300},
-      {id:59,label:'NY32/NY155',x:330,y:220},{id:70,label:'NY2/US9',x:185,y:170}
-    ],
-    edges:[
-      {u:0,v:18,road:'NY40',w:1.186},{u:18,v:33,road:'NY40',w:0.531},
-      {u:33,v:32,road:'NY40,NY142',w:0.1},{u:32,v:57,road:'NY40',w:0.6},
-      {u:57,v:49,road:'NY7',w:0.8},{u:49,v:47,road:'I-787,NY7',w:0.12},
-      {u:47,v:50,road:'I-787,NY7',w:0.35},{u:50,v:48,road:'I-787',w:0.2},
-      {u:48,v:92,road:'I-787',w:0.5},{u:92,v:91,road:'I-787',w:0.25},
-      {u:91,v:121,road:'I-787',w:0.55},{u:121,v:130,road:'I-90',w:0.45},
-      {u:130,v:153,road:'US9',w:0.4},{u:153,v:137,road:'US9W',w:0.42},
-      {u:137,v:151,road:'US9W',w:0.32},{u:151,v:150,road:'US9W,NY443',w:0.28},
-      {u:150,v:152,road:'US9W',w:0.31},{u:152,v:163,road:'NY443',w:0.38},
-      {u:163,v:195,road:'NY140,NY443',w:0.44},
-      // extra edges for visual
-      {u:1,v:41,road:'I-87',w:1.2},{u:41,v:43,road:'NY7',w:0.9},
-      {u:43,v:70,road:'US9',w:0.6},{u:70,v:153,road:'US9',w:2.1},
-      {u:7,v:8,road:'NY236',w:1.4},{u:8,v:10,road:'US9',w:0.5},
-      {u:10,v:11,road:'US9',w:0.4},{u:59,v:95,road:'NY32,NY378',w:0.8},
-      {u:95,v:92,road:'NY378',w:0.9},{u:100,v:95,road:'US4',w:0.7}
-    ],
-    path:[0,18,33,32,57,49,47,50,48,92,91,121,130,153,137,151,150,152,163,195],
-    source:0, target:195,
-    dijk:{dist:18.074,hops:19,visited:172},
-    astar:{dist:18.074,hops:19,visited:57},
-    simSteps:[
-      {edge:{u:0,v:18},road:'NY40',dist:null,delta:null,dVisited:null,aVisited:null,status:'DISCONNECTED'}
-    ],
-    crit:[
-      {road:'NY40',from:'NY40_N/NY142_S',to:'NY40@CR116',score:231000,disc:231},
-      {road:'NY40',from:'NY40@CR116',to:'NY40@FogRd',score:213000,disc:213},
-      {road:'US4,NY32',from:'NY32_Wat/US4_Wat',to:'NY32/US4@SchLn',score:40000,disc:40},
-      {road:'NY32',from:'NY32@CR52',to:'NY32/NY335',score:40000,disc:40},
-      {road:'US20',from:'NY146_W/US20_E',to:'NY155/US20',score:40000,disc:40},
-      {road:'US4,NY32',from:'NY32/US4@SchLn',to:'NY32/US4@LowNewRd',score:20000,disc:20},
-      {road:'NY236',from:'NY236/US9',to:'NY236@CR95',score:20000,disc:20},
-      {road:'NY150',from:'NY150@CR52',to:'NY43/NY150',score:20000,disc:20},
-      {road:'NY5',from:'NY5/NY32',to:'NY5@US9',score:20000,disc:20},
-      {road:'NY151',from:'NY151/US4',to:'NY151@CR53',score:20000,disc:20},
-      {road:'NY335',from:'NY335@FeuBushRd',to:'NY32/NY335',score:20000,disc:20},
-      {road:'NY7',from:'NY7/NY146',to:'I-890(9)/NY7',score:20000,disc:20},
-      {road:'US20,NY146',from:'NY146_E/US20_W',to:'NY146_W/US20_E',score:20000,disc:20},
-      {road:'NY32',from:'NY32@FeuBushRd',to:'NY32@CR52',score:20000,disc:20}
-    ]
+// ════════════════════════════════════════════
+// DATA
+// ════════════════════════════════════════════
+const GRAPHS=[{
+  name:'siena-2mi',V:8,E:6,bridges:6,
+  verts:[
+    {id:0,lbl:'NY2@DelRd',      lat:42.7383,lon:-73.7309},
+    {id:1,lbl:'NY155@DelRd',    lat:42.7288,lon:-73.7371},
+    {id:2,lbl:'NY155@LinAve',   lat:42.7204,lon:-73.7162},
+    {id:3,lbl:'NY155/US9',      lat:42.7368,lon:-73.7623},
+    {id:4,lbl:'US9@FidLn',      lat:42.7204,lon:-73.7556},
+    {id:5,lbl:'NY377/NY378',    lat:42.6985,lon:-73.7388},
+    {id:6,lbl:'NY378@MenRd',    lat:42.6965,lon:-73.7316},
+    {id:7,lbl:'NY378/US9',      lat:42.7049,lon:-73.7545},
+  ],
+  edges:[
+    {u:7,v:4,road:'US9',   w:1.069},
+    {u:4,v:3,road:'US9',   w:1.186},
+    {u:3,v:1,road:'NY155', w:1.393},
+    {u:1,v:2,road:'NY155', w:1.207},
+    {u:7,v:5,road:'NY378', w:0.915},
+    {u:5,v:6,road:'NY378', w:0.390},
+  ],
+  path:[1,3,4,7,5,6],src:1,tgt:6,
+  dijk:{dist:4.953,hops:5,vis:7},
+  astar:{dist:4.953,hops:5,vis:7},
+  simSteps:[
+    {edge:{u:3,v:1},road:'NY155',w:1.393,dist:null,delta:null,dv:null,av:null,status:'DISC'},
+  ],
+  crit:[
+    {road:'US9',   from:'US9@FidLn',   to:'NY155/US9',    score:24000,disc:24},
+    {road:'US9',   from:'NY378/US9',   to:'US9@FidLn',    score:24000,disc:24},
+    {road:'NY155', from:'NY155/US9',   to:'NY155@DelRd',  score:20000,disc:20},
+    {road:'NY378', from:'NY378/US9',   to:'NY377/NY378',  score:20000,disc:20},
+    {road:'NY155', from:'NY155@DelRd', to:'NY155@LinAve', score:12000,disc:12},
+    {road:'NY378', from:'NY377/NY378', to:'NY378@MenRd',  score:12000,disc:12},
+  ],
+},{
+  name:'siena-10mi',V:196,E:240,bridges:14,
+  verts:[
+    {id:0,  lbl:'NY40@FogRd',        lat:42.8049,lon:-73.6342},
+    {id:1,  lbl:'I-87@8',            lat:42.8199,lon:-73.7677},
+    {id:2,  lbl:'I-87@8A',           lat:42.8399,lon:-73.7716},
+    {id:3,  lbl:'I-87(9)/NY146',     lat:42.8624,lon:-73.7753},
+    {id:4,  lbl:'NY32/US4@LowNewRd', lat:42.8418,lon:-73.6755},
+    {id:5,  lbl:'NY32/US4@SchLn',    lat:42.8195,lon:-73.6662},
+    {id:7,  lbl:'NY236@CR95',        lat:42.8535,lon:-73.7273},
+    {id:8,  lbl:'NY236/US9',         lat:42.8351,lon:-73.7399},
+    {id:10, lbl:'US9@CohCreRd',      lat:42.8167,lon:-73.7306},
+    {id:18, lbl:'NY40@CR116',        lat:42.7922,lon:-73.6500},
+    {id:32, lbl:'NY40_S/NY142_N',    lat:42.7848,lon:-73.6540},
+    {id:33, lbl:'NY40_N/NY142_S',    lat:42.7848,lon:-73.6524},
+    {id:41, lbl:'I-87(7)/NY7',       lat:42.7632,lon:-73.7625},
+    {id:43, lbl:'NY7/US9',           lat:42.7605,lon:-73.7566},
+    {id:47, lbl:'I-787/NY7@6thAve',  lat:42.7396,lon:-73.6832},
+    {id:48, lbl:'I-787@8',           lat:42.7326,lon:-73.6982},
+    {id:49, lbl:'I-787/NY7@8thSt',   lat:42.7396,lon:-73.6817},
+    {id:50, lbl:'I-787(9)/NY787',    lat:42.7425,lon:-73.6976},
+    {id:57, lbl:'NY7/NY40',          lat:42.7396,lon:-73.6797},
+    {id:91, lbl:'I-787@6',           lat:42.6829,lon:-73.7219},
+    {id:92, lbl:'I-787(7)/NY378',    lat:42.6999,lon:-73.7077},
+    {id:95, lbl:'NY32/NY378',        lat:42.6982,lon:-73.7195},
+    {id:121,lbl:'I-90@6A&I-787@5',  lat:42.6674,lon:-73.7331},
+    {id:130,lbl:'I-90(6)/US9',       lat:42.6696,lon:-73.7488},
+    {id:137,lbl:'NY5/US9W',          lat:42.7317,lon:-73.8499},
+    {id:150,lbl:'NY443/US9W@MorAve', lat:42.6457,lon:-73.7713},
+    {id:151,lbl:'US20/NY443/US9W',   lat:42.6525,lon:-73.7678},
+    {id:152,lbl:'NY443_W/US9W',      lat:42.6397,lon:-73.7857},
+    {id:153,lbl:'US9/US9W',          lat:42.6599,lon:-73.7588},
+    {id:163,lbl:'NY335/NY443',       lat:42.6263,lon:-73.8215},
+    {id:195,lbl:'NY140/NY443',       lat:42.6222,lon:-73.8329},
+  ],
+  edges:[
+    {u:0,  v:18, road:'NY40',        w:1.186},
+    {u:18, v:33, road:'NY40',        w:0.531},
+    {u:33, v:32, road:'NY40,NY142',  w:0.12},
+    {u:32, v:57, road:'NY40',        w:0.6},
+    {u:57, v:49, road:'NY7',         w:0.8},
+    {u:49, v:47, road:'I-787,NY7',   w:0.12},
+    {u:47, v:50, road:'I-787,NY7',   w:0.35},
+    {u:50, v:48, road:'I-787',       w:0.2},
+    {u:48, v:92, road:'I-787',       w:0.5},
+    {u:92, v:91, road:'I-787',       w:0.25},
+    {u:91, v:121,road:'I-787',       w:0.55},
+    {u:121,v:130,road:'I-90',        w:0.45},
+    {u:130,v:153,road:'US9',         w:0.4},
+    {u:153,v:151,road:'US9W',        w:0.42},
+    {u:151,v:150,road:'US9W,NY443',  w:0.28},
+    {u:150,v:152,road:'US9W',        w:0.31},
+    {u:152,v:163,road:'NY443',       w:0.38},
+    {u:163,v:195,road:'NY140,NY443', w:0.44},
+    {u:1,  v:2,  road:'I-87',        w:0.62},
+    {u:2,  v:3,  road:'I-87',        w:0.71},
+    {u:3,  v:4,  road:'NY146',       w:1.24},
+    {u:4,  v:5,  road:'US4,NY32',    w:1.61},
+    {u:7,  v:8,  road:'NY236',       w:1.43},
+    {u:8,  v:10, road:'US9',         w:0.51},
+    {u:41, v:43, road:'NY7',         w:0.93},
+    {u:43, v:130,road:'US9',         w:2.12},
+    {u:92, v:95, road:'NY378',       w:0.91},
+    {u:95, v:91, road:'NY32',        w:0.82},
+    {u:137,v:1,  road:'NY5',         w:1.21},
+    {u:10, v:43, road:'US9',         w:0.95},
+  ],
+  path:[0,18,33,32,57,49,47,50,48,92,91,121,130,153,151,150,152,163,195],
+  src:0,tgt:195,
+  dijk:{dist:18.074,hops:19,vis:172},
+  astar:{dist:18.074,hops:19,vis:57},
+  simSteps:[
+    {edge:{u:0,v:18},road:'NY40',w:1.186,dist:null,delta:null,dv:null,av:null,status:'DISC'},
+  ],
+  crit:[
+    {road:'NY40',      from:'NY40_N/NY142_S',  to:'NY40@CR116',      score:231000,disc:231},
+    {road:'NY40',      from:'NY40@CR116',       to:'NY40@FogRd',      score:213000,disc:213},
+    {road:'US4,NY32',  from:'NY32_Wat/US4_Wat', to:'NY32/US4@SchLn',  score:40000, disc:40},
+    {road:'NY32',      from:'NY32@CR52',         to:'NY32/NY335',      score:40000, disc:40},
+    {road:'US20',      from:'NY146_W/US20_E',    to:'NY155/US20',      score:40000, disc:40},
+    {road:'US4,NY32',  from:'NY32/US4@SchLn',    to:'NY32/US4@Low',    score:20000, disc:20},
+    {road:'NY236',     from:'NY236/US9',          to:'NY236@CR95',      score:20000, disc:20},
+    {road:'NY150',     from:'NY150@CR52',         to:'NY43/NY150',      score:20000, disc:20},
+    {road:'NY5',       from:'NY5/NY32',           to:'NY5@US9',         score:20000, disc:20},
+    {road:'NY151',     from:'NY151/US4',          to:'NY151@CR53',      score:20000, disc:20},
+    {road:'NY335',     from:'NY335@FeuBushRd',    to:'NY32/NY335',      score:20000, disc:20},
+    {road:'NY7',       from:'NY7/NY146',          to:'I-890(9)/NY7',    score:20000, disc:20},
+    {road:'US20,NY146',from:'NY146_E/US20_W',     to:'NY146_W/US20_E',  score:20000, disc:20},
+    {road:'NY32',      from:'NY32@FeuBushRd',     to:'NY32@CR52',       score:20000, disc:20},
+  ],
+}];
+
+// ════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════
+let CG=0,CP='graph',CV='path';
+let removed=new Set(); // edge indices removed
+let showLbls=false,clickRemove=false;
+let animT=null,failCount=0;
+let particles=[];
+
+// ════════════════════════════════════════════
+// PARTICLE SYSTEM (background ambient)
+// ════════════════════════════════════════════
+const pc=document.getElementById('particles');
+const pctx=pc.getContext('2d');
+function resizePC(){pc.width=window.innerWidth;pc.height=window.innerHeight;}
+resizePC();
+window.addEventListener('resize',resizePC);
+for(let i=0;i<40;i++) particles.push({x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,vx:(Math.random()-.5)*.15,vy:(Math.random()-.5)*.15,r:Math.random()*1.2+.3,a:Math.random()*.4+.05});
+function animParticles(){
+  pctx.clearRect(0,0,pc.width,pc.height);
+  particles.forEach(p=>{
+    p.x+=p.vx;p.y+=p.vy;
+    if(p.x<0)p.x=pc.width;if(p.x>pc.width)p.x=0;
+    if(p.y<0)p.y=pc.height;if(p.y>pc.height)p.y=0;
+    pctx.beginPath();pctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    pctx.fillStyle=`rgba(0,230,118,${p.a})`;pctx.fill();
+  });
+  requestAnimationFrame(animParticles);
+}
+animParticles();
+
+// ════════════════════════════════════════════
+// BURST PARTICLES (edge removal effect)
+// ════════════════════════════════════════════
+function burst(x,y,color='#ff4444'){
+  const canvas=document.getElementById('gsvg').closest('.cbox');
+  const rect=canvas.getBoundingClientRect();
+  const absX=rect.left+x, absY=rect.top+y;
+  const count=18;
+  const bursts=[];
+  for(let i=0;i<count;i++){
+    const angle=(i/count)*Math.PI*2;
+    const speed=2+Math.random()*4;
+    bursts.push({x:absX,y:absY,vx:Math.cos(angle)*speed,vy:Math.sin(angle)*speed,life:1,r:2+Math.random()*2});
   }
-];
-
-// ─── State ────────────────────────────────────────────────────────────────────
-let currentGraph = 0;
-let currentPanel = 'graph';
-let currentView  = 'path';
-let showAllLabels = false;
-let animFrame = null;
-let removedEdgeIndices = [];
-
-// ─── Logging ──────────────────────────────────────────────────────────────────
-function log(msg, type='muted') {
-  const box = document.getElementById('logBox');
-  const d = document.createElement('div');
-  d.className = 'log-line ' + type;
-  const t = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  d.textContent = '['+t+'] ' + msg;
-  box.appendChild(d);
-  box.scrollTop = box.scrollHeight;
-}
-
-// ─── Panel switching ──────────────────────────────────────────────────────────
-function switchPanel(name) {
-  document.querySelectorAll('.nav-item').forEach((n,i) => {
-    n.classList.toggle('active', ['graph','algo','failure','crit'][i] === name);
-  });
-  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('panel-'+name).classList.add('active');
-  currentPanel = name;
-  renderPanel(name);
-}
-
-function renderPanel(name) {
-  if (name==='graph')   drawGraph();
-  if (name==='algo')    renderAlgo();
-  if (name==='failure') renderFailure();
-  if (name==='crit')    renderCrit();
-}
-
-// ─── Graph selector ───────────────────────────────────────────────────────────
-function buildGraphButtons() {
-  const wrap = document.getElementById('graphButtons');
-  wrap.innerHTML = '';
-  GRAPHS.forEach((g,i) => {
-    const btn = document.createElement('button');
-    btn.className = 'graph-btn' + (i===currentGraph?' active':'');
-    btn.innerHTML = g.name+'<small>'+g.V+' vertices &middot; '+g.E+' edges</small>';
-    btn.onclick = () => selectGraph(i);
-    wrap.appendChild(btn);
-  });
-}
-
-function selectGraph(idx) {
-  currentGraph = idx;
-  removedEdgeIndices = [];
-  buildGraphButtons();
-  updateStatCards();
-  renderPanel(currentPanel);
-  log('loaded '+GRAPHS[idx].name, 'info');
-}
-
-function updateStatCards() {
-  const g = GRAPHS[currentGraph];
-  document.getElementById('graph-badge').textContent = g.name+' \u00B7 '+g.V+'V \u00B7 '+g.E+'E';
-  document.getElementById('path-badge').textContent = 'path: '+g.dijk.dist.toFixed(3)+'mi \u00B7 '+g.dijk.hops+' hops';
-  document.getElementById('stat-v').textContent = g.V;
-  document.getElementById('stat-e').textContent = g.E;
-  document.getElementById('stat-b').textContent = g.bridges;
-  const bpct = Math.round(g.bridges/g.E*100);
-  document.getElementById('bridge-pct').textContent = bpct+'%';
-  document.getElementById('bridge-bar').style.width = bpct+'%';
-  const eff = g.dijk.visited > 0 ? Math.round(100*(g.dijk.visited-g.astar.visited)/g.dijk.visited) : 0;
-  document.getElementById('stat-eff').textContent = eff+'%';
-  document.getElementById('stat-crit').textContent = g.crit[0]?.road || '—';
-  document.getElementById('stat-crit-sub').textContent = 'score: '+(g.crit[0]?.score>=1000?(g.crit[0].score/1000).toFixed(0)+'k':g.crit[0]?.score)+' \u00B7 '+g.crit[0]?.disc+' pairs disconnected';
-}
-
-// ─── Graph drawing ────────────────────────────────────────────────────────────
-function setView(v, el) {
-  currentView = v;
-  document.querySelectorAll('.toolbar-btn').forEach(b=>b.classList.remove('active'));
-  el.classList.add('active');
-  const labels = {path:'showing shortest path',all:'all edges visible',crit:'critical edges highlighted',failure:'simulated failure state'};
-  document.getElementById('graph-desc').textContent = labels[v]||'';
-  drawGraph();
-}
-
-function toggleShowAllLabels() {
-  showAllLabels = !showAllLabels;
-  drawGraph();
-  log('labels '+(showAllLabels?'on':'off'), 'muted');
-}
-
-function drawGraph() {
-  const canvas = document.getElementById('netCanvas');
-  const wrap = canvas.parentElement;
-  canvas.width = wrap.clientWidth;
-  canvas.height = wrap.clientHeight;
-  const ctx = canvas.getContext('2d');
-  const g = GRAPHS[currentGraph];
-  const W = canvas.width, H = canvas.height;
-
-  // Scale vertices to canvas
-  const allX = g.vertices.map(v=>v.x), allY = g.vertices.map(v=>v.y);
-  const minX=Math.min(...allX), maxX=Math.max(...allX), minY=Math.min(...allY), maxY=Math.max(...allY);
-  const pad = 60;
-  const scaleX = v => pad + (v.x-minX)/(maxX-minX||1)*(W-2*pad);
-  const scaleY = v => pad + (v.y-minY)/(maxY-minY||1)*(H-2*pad);
-
-  const vmap = {};
-  g.vertices.forEach(v => { vmap[v.id] = v; });
-
-  ctx.fillStyle = '#111417';
-  ctx.fillRect(0,0,W,H);
-
-  const pathSet = new Set();
-  for (let i=0; i<g.path.length-1; i++) {
-    pathSet.add(g.path[i]+'-'+g.path[i+1]);
-    pathSet.add(g.path[i+1]+'-'+g.path[i]);
+  const bctx=pctx;
+  let frame=0;
+  function drawBurst(){
+    bursts.forEach(b=>{
+      b.x+=b.vx;b.y+=b.vy;b.vy+=0.12;b.life-=0.035;b.vx*=0.95;
+      if(b.life>0){
+        bctx.beginPath();bctx.arc(b.x,b.y,b.r*b.life,0,Math.PI*2);
+        bctx.fillStyle=color.replace(')',`,${b.life})`).replace('rgb','rgba');
+        if(!color.includes('rgb')) bctx.fillStyle=`rgba(255,68,68,${b.life})`;
+        bctx.fill();
+      }
+    });
+    if(frame++<60&&bursts.some(b=>b.life>0)) requestAnimationFrame(drawBurst);
   }
-
-  const critEdgeSet = new Set(g.crit.slice(0,5).map(c=>c.from+'|'+c.to));
-
-  g.edges.forEach((e,idx) => {
-    const u=vmap[e.u], v=vmap[e.v];
-    if (!u||!v) return;
-    const removed = removedEdgeIndices.includes(idx);
-    const onPath = pathSet.has(e.u+'-'+e.v);
-    const isCrit = currentView==='crit' && (critEdgeSet.has(u.label+'|'+v.label)||critEdgeSet.has(v.label+'|'+u.label));
-
-    if (removed && currentView==='failure') return;
-
-    ctx.beginPath();
-    ctx.moveTo(scaleX(u), scaleY(u));
-    ctx.lineTo(scaleX(v), scaleY(v));
-
-    if (removed) {
-      ctx.strokeStyle = 'rgba(248,113,113,0.15)';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([4,4]);
-    } else if (currentView==='path' && onPath) {
-      ctx.strokeStyle = '#4ade80';
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([]);
-    } else if (isCrit) {
-      ctx.strokeStyle = 'rgba(248,113,113,0.7)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-    } else {
-      ctx.strokeStyle = '#2a3038';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // edge weight label on path
-    if (currentView==='path' && onPath && g.V<=20) {
-      const mx=(scaleX(u)+scaleX(v))/2, my=(scaleY(u)+scaleY(v))/2;
-      ctx.fillStyle='rgba(74,222,128,0.7)';
-      ctx.font='9px DM Mono,monospace';
-      ctx.fillText(e.w.toFixed(2)+'mi', mx+4, my-3);
-    }
-  });
-
-  // Nodes
-  g.vertices.forEach(v => {
-    const x=scaleX(v), y=scaleY(v);
-    const onPath = g.path.includes(v.id);
-    const isSource = v.id===g.source;
-    const isTarget = v.id===g.target;
-    const r = isSource||isTarget ? 7 : onPath ? 5 : 3.5;
-
-    ctx.beginPath();
-    ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fillStyle = isSource||isTarget ? '#4ade80' : onPath ? '#22d3ee' : '#2a3038';
-    ctx.fill();
-    if (isSource||isTarget) {
-      ctx.strokeStyle='rgba(74,222,128,0.4)';
-      ctx.lineWidth=3;
-      ctx.stroke();
-    }
-
-    // Labels
-    if (showAllLabels || onPath || isSource || isTarget) {
-      ctx.fillStyle = isSource||isTarget ? '#4ade80' : onPath ? '#22d3ee' : '#5a6370';
-      ctx.font = (isSource||isTarget?'500 ':'')+'10px DM Mono,monospace';
-      const lbl = v.label.split('@')[0].split('/')[0].replace('NY','').replace('US','US').substring(0,8);
-      ctx.fillText(lbl, x+9, y+4);
-    }
-  });
-
-  // Source/target labels
-  [g.source, g.target].forEach((id,i) => {
-    const v = vmap[id];
-    if (!v) return;
-    ctx.fillStyle = '#4ade80';
-    ctx.font = '500 11px DM Sans,sans-serif';
-    ctx.fillText((i===0?'▶ Source: ':'◀ Target: ')+v.label, 10, 18+i*18);
-  });
+  drawBurst();
 }
 
-// ─── Algorithm panel ─────────────────────────────────────────────────────────
-function renderAlgo() {
-  const g = GRAPHS[currentGraph];
-  document.getElementById('algo-graph-label').textContent = g.name;
-  document.getElementById('d-dist').textContent = g.dijk.dist.toFixed(3)+' mi';
-  document.getElementById('d-hops').textContent = g.dijk.hops;
-  document.getElementById('d-visited').textContent = g.dijk.visited;
-  document.getElementById('a-dist').textContent = g.astar.dist.toFixed(3)+' mi';
-  document.getElementById('a-hops').textContent = g.astar.hops;
-  document.getElementById('a-visited').textContent = g.astar.visited;
-
-  const eff = g.dijk.visited>0 ? Math.round(100*(g.dijk.visited-g.astar.visited)/g.dijk.visited) : 0;
-  document.getElementById('eff-bar').style.width = eff+'%';
-  document.getElementById('eff-pct').textContent = eff+'%';
-  document.getElementById('astar-tag').textContent = eff>0 ? eff+'% faster' : 'same speed';
-  document.getElementById('eff-note').textContent = eff>0
-    ? 'A* explored '+eff+'% fewer nodes on '+g.name+' ('+g.astar.visited+' vs '+g.dijk.visited+')'
-    : 'A* and Dijkstra performed identically on this small graph';
-
-  // Path display
-  const pd = document.getElementById('path-display');
-  const vmap = {};
-  g.vertices.forEach(v=>vmap[v.id]=v);
-  pd.innerHTML = '';
-  g.path.forEach((nid,i)=>{
-    const v=vmap[nid];
-    const sp=document.createElement('span');
-    sp.className='path-node';
-    sp.title=v?v.label:'vertex '+nid;
-    sp.textContent=(v?v.label.split('@')[0].split('/')[0]:'?')+'#'+nid;
-    pd.appendChild(sp);
-    if(i<g.path.length-1){const a=document.createElement('span');a.className='path-arrow';a.textContent='→';pd.appendChild(a);}
-  });
-
-  // Failure degradation rows
-  const rows=document.getElementById('failure-algo-rows');
-  rows.innerHTML='<div style="font-size:11px;color:var(--text3)">Baseline: '+g.dijk.visited+' (D) vs '+g.astar.visited+' (A*) nodes visited</div>';
-  g.simSteps.forEach((s,i)=>{
-    const div=document.createElement('div');
-    div.style.cssText='display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border)';
-    div.innerHTML='<span style="color:var(--accent3)">step '+(i+1)+' ('+s.road+')</span><span>'+(s.status==='DISCONNECTED'?'<span style="color:var(--accent4)">disconnected</span>':'D:'+s.dVisited+' A*:'+s.aVisited)+'</span>';
-    rows.appendChild(div);
-  });
+// ════════════════════════════════════════════
+// LOGGING
+// ════════════════════════════════════════════
+function log(msg,t='d'){
+  const b=document.getElementById('logbox');
+  const d=document.createElement('div');d.className='ll';
+  const ts=new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  d.innerHTML=`<span class="lt">${ts}</span><span class="lm ${t}">${msg}</span>`;
+  b.appendChild(d);b.scrollTop=b.scrollHeight;
 }
 
-// ─── Failure panel ────────────────────────────────────────────────────────────
-function renderFailure() {
-  const g = GRAPHS[currentGraph];
-  const slider = document.getElementById('simSlider');
-  slider.max = g.simSteps.length;
-  slider.value = 0;
-  updateSim(0);
-  drawFailChart();
-  document.getElementById('failure-insight').innerHTML =
-    '<span style="color:var(--accent3);font-family:var(--mono);font-size:10px;letter-spacing:0.8px">INSIGHT</span><br>' +
-    (g.simSteps[0]?.status==='DISCONNECTED'
-      ? 'Removing the first edge (<strong style="color:var(--accent3)">'+g.simSteps[0].road+'</strong>) immediately disconnects the network — this road is a bridge with no alternative route.'
-      : 'The network degrades gradually. Watch how path distance increases with each removal.');
+// ════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════
+function go(name){
+  document.querySelectorAll('.nav').forEach((n,i)=>n.classList.toggle('on',['graph','algo','fail','crit'][i]===name));
+  document.querySelectorAll('.pn').forEach(p=>p.classList.remove('on'));
+  document.getElementById('pn-'+name).classList.add('on');
+  CP=name;
+  ({graph:drawGraph,algo:renderAlgo,fail:renderFail,crit:renderCrit})[name]?.();
 }
 
-function updateSim(step) {
-  step = parseInt(step);
-  document.getElementById('simStepVal').textContent = step===0?'baseline':'step '+step;
-  const g = GRAPHS[currentGraph];
-  const tbody = document.getElementById('simTbody');
-  let html = '<tr class="row-baseline"><td class="mono" style="color:var(--text3)">—</td><td class="mono" colspan="2" style="color:var(--text3)">baseline (intact)</td><td class="mono">'+g.dijk.dist.toFixed(3)+' mi</td><td class="mono" style="color:var(--text3)">+0.000</td><td class="mono">'+g.astar.visited+'</td><td class="mono">'+g.dijk.visited+'</td><td><span class="tag-ok">OK</span></td></tr>';
-
-  for (let i=0; i<Math.min(step,g.simSteps.length); i++) {
-    const s = g.simSteps[i];
-    const cls = i===step-1 ? 'row-current' : (s.status==='DISCONNECTED'?'row-disc':'row-ok');
-    html += '<tr class="'+cls+'"><td class="mono">'+(i+1)+'</td><td class="mono" style="color:var(--accent3)">'+s.road+'</td><td class="mono" style="color:var(--text3);font-size:10px">('+s.edge.u+'↔'+s.edge.v+')</td>';
-    html += s.status==='DISCONNECTED'
-      ? '<td class="mono" style="color:var(--accent4)">N/A</td><td class="mono" style="color:var(--accent4)">∞</td><td class="mono">—</td><td class="mono">—</td><td><span class="tag-disc">DISCONNECTED</span></td>'
-      : '<td class="mono">'+s.dist.toFixed(3)+' mi</td><td class="mono" style="color:var(--accent3)">+'+s.delta.toFixed(3)+'</td><td class="mono">'+s.aVisited+'</td><td class="mono">'+s.dVisited+'</td><td><span class="tag-ok">OK</span></td>';
-    html += '</tr>';
-  }
-  tbody.innerHTML = html;
-
-  // update removed edges for graph view
-  removedEdgeIndices = [];
-  const g2 = GRAPHS[currentGraph];
-  for (let i=0; i<step && i<g2.simSteps.length; i++) {
-    const s=g2.simSteps[i];
-    const idx=g2.edges.findIndex(e=>(e.u===s.edge.u&&e.v===s.edge.v)||(e.u===s.edge.v&&e.v===s.edge.u));
-    if(idx>=0) removedEdgeIndices.push(idx);
-  }
-  if(currentPanel==='graph') drawGraph();
-}
-
-function drawFailChart() {
-  const canvas = document.getElementById('failCanvas');
-  canvas.width = canvas.parentElement.clientWidth - 28;
-  const ctx = canvas.getContext('2d');
-  const g = GRAPHS[currentGraph];
-  const W=canvas.width, H=canvas.height;
-  ctx.clearRect(0,0,W,H);
-
-  const labels=['Baseline',...g.simSteps.map((_,i)=>'S'+(i+1))];
-  const vals=[0,...g.simSteps.map(s=>s.status==='DISCONNECTED'?null:s.delta)];
-  const n=labels.length;
-  const bw=Math.max(16,Math.min(50,(W-50)/n*0.6));
-  const gap=(W-50)/n;
-  const maxV=Math.max(...vals.filter(v=>v!==null),5);
-
-  labels.forEach((label,i) => {
-    const x=30+i*gap+(gap-bw)/2;
-    const v=vals[i];
-    if(v===null){
-      ctx.fillStyle='rgba(248,113,113,0.18)';
-      ctx.fillRect(x,6,bw,H-26);
-      ctx.fillStyle='#f87171';
-      ctx.font='10px DM Mono,monospace';
-      ctx.textAlign='center';
-      ctx.fillText('∞',x+bw/2,H-28);
-    } else {
-      const bh=Math.max(2,(v/maxV)*(H-26));
-      ctx.fillStyle=i===0?'rgba(74,222,128,0.15)':'rgba(245,158,11,0.4)';
-      ctx.strokeStyle=i===0?'rgba(74,222,128,0.4)':'rgba(245,158,11,0.6)';
-      ctx.lineWidth=0.5;
-      ctx.fillRect(x,H-26-bh,bw,bh);
-      ctx.strokeRect(x,H-26-bh,bw,bh);
-      if(v>0){ctx.fillStyle='var(--accent3)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';ctx.fillText('+'+v.toFixed(2),x+bw/2,H-30-bh);}
-    }
-    ctx.fillStyle='#5a6370';
-    ctx.font='9px DM Mono,monospace';
-    ctx.textAlign='center';
-    ctx.fillText(label,x+bw/2,H-8);
-  });
-  // axes
-  ctx.strokeStyle='#2a3038';ctx.lineWidth=0.5;ctx.setLineDash([]);
-  ctx.beginPath();ctx.moveTo(28,0);ctx.lineTo(28,H-20);ctx.stroke();
-  ctx.beginPath();ctx.moveTo(28,H-20);ctx.lineTo(W,H-20);ctx.stroke();
-}
-
-// ─── Criticality panel ───────────────────────────────────────────────────────
-function renderCrit() {
-  const g = GRAPHS[currentGraph];
-  document.getElementById('crit-label').textContent = g.name+' \u00B7 '+g.crit.length+' edges scored';
-  const maxScore = g.crit[0]?.score||1;
-
-  document.getElementById('critList').innerHTML = g.crit.map((c,i) => {
-    const pct = Math.round(c.score/maxScore*100);
-    const color = i<2?'var(--accent4)':i<5?'var(--accent3)':'var(--accent2)';
-    return `<div class="crit-item" title="${c.from} ↔ ${c.to}">
-      <span class="crit-rank">${i+1}</span>
-      <span class="crit-road" style="color:${i<2?'var(--accent4)':i<5?'var(--accent3)':'var(--accent3)'}">${c.road}</span>
-      <div class="crit-bar-bg"><div class="crit-bar-fill" style="width:${pct}%;background:${color}"></div></div>
-      <span class="crit-score">${c.score>=1000?(c.score/1000).toFixed(0)+'k':c.score}</span>
-      <span class="crit-disc">${c.disc}×</span>
-    </div>`;
-  }).join('');
-
-  const bridges = g.crit.filter(c=>c.disc>0);
-  document.getElementById('bridge-desc').textContent =
-    bridges.length+' bridge edges found in '+g.name+'. Each disconnects isolated vertex pairs when removed.';
-  document.getElementById('bridge-list').innerHTML = bridges.map(c =>
-    `<div class="bridge-row"><span style="color:var(--accent3)">${c.road}</span><span>${c.from.split('@')[0]} ↔ ${c.to.split('@')[0]}</span><span style="color:var(--accent4)">${c.disc}×</span></div>`
+// ════════════════════════════════════════════
+// GRAPH BUTTONS
+// ════════════════════════════════════════════
+function buildBtns(){
+  document.getElementById('gbtns').innerHTML=GRAPHS.map((g,i)=>
+    `<button class="gb${i===CG?' on':''}" onclick="selG(${i})">${g.name}<small>${g.V}V · ${g.E}E</small></button>`
   ).join('');
 }
+function selG(i){
+  CG=i;removed.clear();failCount=0;
+  document.getElementById('sfail').textContent='0';
+  buildBtns();updChips();
+  ({graph:drawGraph,algo:renderAlgo,fail:renderFail,crit:renderCrit})[CP]?.();
+  log(`loaded ${GRAPHS[i].name} (${GRAPHS[i].V}V ${GRAPHS[i].E}E)`,'c');
+}
+function updChips(){
+  const g=GRAPHS[CG];
+  const eff=g.dijk.vis>0?Math.round(100*(g.dijk.vis-g.astar.vis)/g.dijk.vis):0;
+  document.getElementById('chip-g').textContent=`${g.name} · ${g.V}V · ${g.E}E`;
+  document.getElementById('chip-p').textContent=`path ${g.dijk.dist.toFixed(3)}mi · ${g.dijk.hops} hops`;
+  document.getElementById('chip-e').textContent=`A* ${eff}% gain`;
+  document.getElementById('sv').textContent=g.V;
+  document.getElementById('se').textContent=g.E;
+  document.getElementById('sb').textContent=g.bridges;
+  const bp=Math.round(g.bridges/g.E*100);
+  document.getElementById('bpct').textContent=bp+'%';
+  document.getElementById('bbar').style.width=bp+'%';
+  document.getElementById('seff').textContent=eff+'%';
+  document.getElementById('scrit').textContent=g.crit[0]?.road||'—';
+  document.getElementById('scritp').textContent=`score ${(g.crit[0]?.score/1000||0).toFixed(0)}k · ${g.crit[0]?.disc||0} pairs`;
+}
 
-// ─── Edge removal animation ───────────────────────────────────────────────────
-function animateEdgeRemoval() {
-  const g = GRAPHS[currentGraph];
-  if (currentPanel !== 'graph') { switchPanel('graph'); }
-  setView('failure', document.getElementById('btn-failure'));
-  removedEdgeIndices = [];
-  let step = 0;
-  log('animating edge removal sequence', 'warn');
-  function next() {
-    if (step >= g.simSteps.length) { log('animation complete', 'ok'); return; }
-    const s = g.simSteps[step];
-    const idx = g.edges.findIndex(e=>(e.u===s.edge.u&&e.v===s.edge.v)||(e.u===s.edge.v&&e.v===s.edge.u));
-    if(idx>=0) removedEdgeIndices.push(idx);
-    drawGraph();
-    log('removed edge: '+s.road+' ('+s.edge.u+'↔'+s.edge.v+')', s.status==='DISCONNECTED'?'err':'warn');
-    step++;
-    animFrame = setTimeout(next, 900);
+// ════════════════════════════════════════════
+// VIEW / CLICK-TO-REMOVE TOGGLE
+// ════════════════════════════════════════════
+function setView(v,el){
+  CV=v;
+  document.querySelectorAll('.tbb:not(#vb-click)').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  const desc={path:'intact network · shortest path highlighted',all:'all edges visible',crit:'top-5 critical edges in red'};
+  document.getElementById('vdesc').textContent=desc[v]||'';
+  drawGraph();
+}
+function toggleClickRemove(){
+  clickRemove=!clickRemove;
+  const b=document.getElementById('vb-click');
+  b.textContent='click-to-remove: '+(clickRemove?'ON':'off');
+  b.classList.toggle('on',clickRemove);
+  document.getElementById('cbox').style.cursor=clickRemove?'crosshair':'default';
+  log('click-to-remove '+(clickRemove?'enabled — click edges to break them':'disabled'),'a');
+}
+function toggleLbls(){showLbls=!showLbls;drawGraph();log('labels '+(showLbls?'on':'off'),'d');}
+
+// ════════════════════════════════════════════
+// GRAPH DRAWING
+// ════════════════════════════════════════════
+function drawGraph(){
+  const g=GRAPHS[CG];
+  const box=document.getElementById('cbox');
+  const W=box.clientWidth,H=box.clientHeight;
+  if(!W||!H)return;
+
+  // Geo projection
+  const lats=g.verts.map(v=>v.lat),lons=g.verts.map(v=>v.lon);
+  const minLat=Math.min(...lats),maxLat=Math.max(...lats);
+  const minLon=Math.min(...lons),maxLon=Math.max(...lons);
+  const pad=60;
+  const px=v=>pad+(v.lon-minLon)/(maxLon-minLon||.001)*(W-2*pad);
+  const py=v=>H-pad-(v.lat-minLat)/(maxLat-minLat||.001)*(H-2*pad);
+
+  const vmap={};g.verts.forEach(v=>vmap[v.id]=v);
+
+  const pathSet=new Set();
+  for(let i=0;i<g.path.length-1;i++){
+    pathSet.add(`${g.path[i]}-${g.path[i+1]}`);
+    pathSet.add(`${g.path[i+1]}-${g.path[i]}`);
   }
-  clearTimeout(animFrame);
+  const critSet=new Set(g.crit.slice(0,5).map(c=>c.from+'|'+c.to));
+
+  const svg=d3.select('#gsvg').attr('width',W).attr('height',H);
+  svg.selectAll('*').remove();
+
+  // Defs
+  const defs=svg.append('defs');
+  const mkGlow=(id,color,blur=4)=>{
+    const f=defs.append('filter').attr('id',id).attr('x','-50%').attr('y','-50%').attr('width','200%').attr('height','200%');
+    f.append('feGaussianBlur').attr('stdDeviation',blur).attr('result','b');
+    const m=f.append('feMerge');m.append('feMergeNode').attr('in','b');m.append('feMergeNode').attr('in','SourceGraphic');
+  };
+  mkGlow('gl-g','#00e676',5);mkGlow('gl-c','#18e8ff',4);mkGlow('gl-r','#ff4444',5);mkGlow('gl-a','#ffab00',3);
+
+  // Grid dots (subtle)
+  for(let gx=0;gx<W;gx+=40)for(let gy=0;gy<H;gy+=40){
+    svg.append('circle').attr('cx',gx).attr('cy',gy).attr('r',.5).attr('fill','rgba(255,255,255,0.03)');
+  }
+
+  // Draw edges
+  g.edges.forEach((e,idx)=>{
+    const u=vmap[e.u],v=vmap[e.v];if(!u||!v)return;
+    const isRemoved=removed.has(idx);
+    const onPath=pathSet.has(`${e.u}-${e.v}`);
+    const isCrit5=CV==='crit'&&(critSet.has(u.lbl+'|'+v.lbl)||critSet.has(v.lbl+'|'+u.lbl));
+    const x1=px(u),y1=py(u),x2=px(v),y2=py(v);
+
+    if(isRemoved){
+      // Broken edge: dashed red with gap in middle
+      const mx=(x1+x2)/2,my=(y1+y2)/2;
+      svg.append('line').attr('x1',x1).attr('y1',y1).attr('x2',mx*.97+x1*.03).attr('y2',my*.97+y1*.03)
+        .attr('stroke','rgba(255,68,68,0.25)').attr('stroke-width',1.5).attr('stroke-dasharray','3,4').attr('filter','url(#gl-r)');
+      svg.append('line').attr('x1',mx*1.03+x2*.97-(x2-x1)*0.03).attr('y1',my*1.03+y2*.97-(y2-y1)*0.03).attr('x2',x2).attr('y2',y2)
+        .attr('stroke','rgba(255,68,68,0.25)').attr('stroke-width',1.5).attr('stroke-dasharray','3,4').attr('filter','url(#gl-r)');
+      // X mark at midpoint
+      const s=6;
+      svg.append('line').attr('x1',mx-s).attr('y1',my-s).attr('x2',mx+s).attr('y2',my+s).attr('stroke','#ff4444').attr('stroke-width',1.5).attr('opacity',.7);
+      svg.append('line').attr('x1',mx+s).attr('y1',my-s).attr('x2',mx-s).attr('y2',my+s).attr('stroke','#ff4444').attr('stroke-width',1.5).attr('opacity',.7);
+      return;
+    }
+
+    let color='rgba(255,255,255,0.07)',width=1,filter='none';
+    if(CV==='path'&&onPath){color='#00e676';width=2.5;filter='url(#gl-g)';}
+    else if(isCrit5){color='rgba(255,68,68,0.6)';width=2;filter='url(#gl-r)';}
+
+    const line=svg.append('line')
+      .attr('x1',x1).attr('y1',y1).attr('x2',x2).attr('y2',y2)
+      .attr('stroke',color).attr('stroke-width',width).attr('filter',filter)
+      .style('cursor',clickRemove?'crosshair':'default');
+
+    // Weight label on path (small graphs)
+    if(CV==='path'&&onPath&&g.V<=20){
+      svg.append('text').attr('x',(x1+x2)/2+4).attr('y',(y1+y2)/2-4)
+        .attr('font-size',9).attr('font-family','JetBrains Mono,monospace')
+        .attr('fill','rgba(0,230,118,0.6)').text(e.w.toFixed(2)+'mi');
+    }
+
+    // Hit area
+    const hit=svg.append('line')
+      .attr('x1',x1).attr('y1',y1).attr('x2',x2).attr('y2',y2)
+      .attr('stroke','transparent').attr('stroke-width',14)
+      .style('cursor',clickRemove?'crosshair':'default');
+
+    hit.on('mouseover',(ev)=>{
+      const tip=document.getElementById('tip');
+      const bx=document.getElementById('cbox').getBoundingClientRect();
+      tip.innerHTML=`<b style="color:${onPath?'var(--g)':'var(--c)'}">${e.road}</b><br>${u.lbl} ↔ ${v.lbl}<br><span style="color:var(--t3)">${e.w.toFixed(3)} miles</span>${clickRemove?'<br><span style="color:var(--a)">click to break edge</span>':''}`;
+      tip.style.opacity='1';
+      tip.style.left=(ev.clientX-bx.left+12)+'px';
+      tip.style.top=(ev.clientY-bx.top-10)+'px';
+    });
+    hit.on('mouseout',()=>document.getElementById('tip').style.opacity='0');
+    hit.on('click',()=>{
+      if(!clickRemove)return;
+      removeEdge(idx,e,(px(u)+px(v))/2,(py(u)+py(v))/2);
+    });
+  });
+
+  // Draw nodes
+  g.verts.forEach(v=>{
+    const x=px(v),y=py(v);
+    const onPath=g.path.includes(v.id);
+    const isSrc=v.id===g.src,isTgt=v.id===g.tgt;
+    const r=isSrc||isTgt?8:onPath?5.5:3;
+    const fill=isSrc||isTgt?'#00e676':onPath?'#18e8ff':'#2a3a4a';
+    const filter=isSrc||isTgt?'url(#gl-g)':onPath?'url(#gl-c)':'none';
+
+    // Outer ring for src/tgt
+    if(isSrc||isTgt){
+      svg.append('circle').attr('cx',x).attr('cy',y).attr('r',r+5)
+        .attr('fill','none').attr('stroke','rgba(0,230,118,0.2)').attr('stroke-width',1.5);
+    }
+
+    svg.append('circle').attr('cx',x).attr('cy',y).attr('r',r)
+      .attr('fill',fill).attr('filter',filter).style('cursor','pointer')
+      .on('mouseover',(ev)=>{
+        const tip=document.getElementById('tip');
+        const bx=document.getElementById('cbox').getBoundingClientRect();
+        tip.innerHTML=`<b style="color:${fill}">${v.lbl}</b><br>id: ${v.id}<br><span style="color:var(--t3)">${v.lat.toFixed(5)}°N ${Math.abs(v.lon).toFixed(5)}°W</span>`;
+        tip.style.opacity='1';
+        tip.style.left=(ev.clientX-bx.left+12)+'px';
+        tip.style.top=(ev.clientY-bx.top-10)+'px';
+        document.getElementById('ginfo').textContent=v.lbl+' (id:'+v.id+')';
+      })
+      .on('mouseout',()=>{document.getElementById('tip').style.opacity='0';document.getElementById('ginfo').textContent='hover for details';});
+
+    if(showLbls||onPath||isSrc||isTgt){
+      const lbl=v.lbl.length>20?v.lbl.substring(0,19)+'…':v.lbl;
+      svg.append('text').attr('x',x+r+4).attr('y',y+4)
+        .attr('font-size',isSrc||isTgt?10:9).attr('font-family','JetBrains Mono,monospace')
+        .attr('fill',isSrc||isTgt?'#00e676':onPath?'#18e8ff':'rgba(255,255,255,0.25)')
+        .text(lbl);
+    }
+  });
+
+  // Source/target tags
+  [[g.src,'▶ Source','#00e676'],[g.tgt,'◀ Target','#18e8ff']].forEach(([id,tag,clr],i)=>{
+    const v=vmap[id];if(!v)return;
+    svg.append('text').attr('x',10).attr('y',16+i*16)
+      .attr('font-size',10).attr('font-family','JetBrains Mono,monospace').attr('fill',clr)
+      .text(`${tag}: ${v.lbl}`);
+  });
+
+  // Removed edge count badge
+  const ctr=document.getElementById('failctr');
+  if(removed.size>0){
+    ctr.style.display='block';
+    ctr.textContent=`${removed.size} edge${removed.size>1?'s':''} removed · network ${removed.size>0?'degraded':'intact'}`;
+  } else {
+    ctr.style.display='none';
+  }
+}
+
+// ════════════════════════════════════════════
+// EDGE REMOVAL with animation
+// ════════════════════════════════════════════
+function removeEdge(idx,e,mx,my){
+  if(removed.has(idx)){
+    removed.delete(idx);
+    log(`restored ${e.road} (${e.u}↔${e.v})`,'g');
+  } else {
+    removed.add(idx);
+    failCount++;
+    document.getElementById('sfail').textContent=failCount;
+    // Burst at midpoint of edge on canvas
+    burst(mx,my,'#ff4444');
+    log(`FAILURE: removed ${e.road} (${e.u}↔${e.v}) ${e.w.toFixed(3)}mi`,'r');
+    // Screen flash
+    const box=document.getElementById('cbox');
+    box.style.boxShadow='0 0 0 2px rgba(255,68,68,0.6)';
+    setTimeout(()=>box.style.boxShadow='',600);
+  }
+  drawGraph();
+}
+
+// ════════════════════════════════════════════
+// RANDOM FAILURE
+// ════════════════════════════════════════════
+function randomFailure(){
+  const g=GRAPHS[CG];
+  const active=g.edges.map((_,i)=>i).filter(i=>!removed.has(i));
+  if(!active.length){log('all edges already removed!','r');return;}
+  // Prefer non-path edges for drama (50%) or any edge (50%)
+  const pathSet=new Set();
+  for(let i=0;i<g.path.length-1;i++){pathSet.add(`${g.path[i]}-${g.path[i+1]}`);pathSet.add(`${g.path[i+1]}-${g.path[i]}`);}
+  const nonPath=active.filter(i=>!pathSet.has(`${g.edges[i].u}-${g.edges[i].v}`)&&!pathSet.has(`${g.edges[i].v}-${g.edges[i].u}`));
+  const pool=Math.random()<.5&&nonPath.length?nonPath:active;
+  const pick=pool[Math.floor(Math.random()*pool.length)];
+  const e=g.edges[pick];
+  if(CP!=='graph')go('graph');
+
+  // Get canvas position for burst
+  const box=document.getElementById('cbox');
+  const W=box.clientWidth,H=box.clientHeight;
+  const lats=g.verts.map(v=>v.lat),lons=g.verts.map(v=>v.lon);
+  const minLat=Math.min(...lats),maxLat=Math.max(...lats);
+  const minLon=Math.min(...lons),maxLon=Math.max(...lons);
+  const pad=60;
+  const u=g.verts.find(v=>v.id===e.u),v=g.verts.find(v=>v.id===e.v);
+  let mx=W/2,my=H/2;
+  if(u&&v){
+    const px=vx=>pad+(vx.lon-minLon)/(maxLon-minLon||.001)*(W-2*pad);
+    const py=vy=>H-pad-(vy.lat-minLat)/(maxLat-minLat||.001)*(H-2*pad);
+    mx=(px(u)+px(v))/2;my=(py(u)+py(v))/2;
+  }
+  removeEdge(pick,e,mx,my);
+  log(`random failure triggered on ${e.road}`,'a');
+}
+
+// ════════════════════════════════════════════
+// ANIMATE FAILURE SEQUENCE
+// ════════════════════════════════════════════
+function startAnim(){
+  const g=GRAPHS[CG];
+  if(CP!=='graph')go('graph');
+  removed.clear();drawGraph();
+  clearTimeout(animT);
+  let step=0;
+  const btn=document.getElementById('animBtn');
+  btn.classList.add('active-anim');
+
+  const box=document.getElementById('cbox');
+  const W=box.clientWidth,H=box.clientHeight;
+  const lats=g.verts.map(v=>v.lat),lons=g.verts.map(v=>v.lon);
+  const minLat=Math.min(...lats),maxLat=Math.max(...lats);
+  const minLon=Math.min(...lons),maxLon=Math.max(...lons);
+  const pad=60;
+  const pxf=vx=>pad+(vx.lon-minLon)/(maxLon-minLon||.001)*(W-2*pad);
+  const pyf=vy=>H-pad-(vy.lat-minLat)/(maxLat-minLat||.001)*(H-2*pad);
+
+  log('starting failure sequence…','a');
+
+  function next(){
+    if(step>=g.simSteps.length){
+      btn.classList.remove('active-anim');
+      log('sequence complete — network '+(removed.size?'degraded':'intact'),'g');
+      return;
+    }
+    const s=g.simSteps[step];
+    const idx=g.edges.findIndex(e=>(e.u===s.edge.u&&e.v===s.edge.v)||(e.u===s.edge.v&&e.v===s.edge.u));
+    const e=g.edges[idx];
+    let mx=W/2,my=H/2;
+    if(e){
+      const u=g.verts.find(v=>v.id===e.u),v=g.verts.find(v=>v.id===e.v);
+      if(u&&v){mx=(pxf(u)+pxf(v))/2;my=(pyf(u)+pyf(v))/2;}
+    }
+    if(idx>=0)removeEdge(idx,e||{road:s.road,u:s.edge.u,v:s.edge.v,w:s.w},mx,my);
+    step++;
+    animT=setTimeout(next,1100);
+  }
   next();
 }
 
-// ─── Export ───────────────────────────────────────────────────────────────────
-function exportResults() {
-  const g = GRAPHS[currentGraph];
-  const lines = [
-    'NETWORK RESILIENCE ANALYSIS — '+g.name.toUpperCase(),
-    'CSIS 385 — Donnelly & Majtyka — Spring 2026',
-    '='.repeat(60),
-    '',
-    'GRAPH: '+g.V+' vertices, '+g.E+' edges',
-    '',
-    'DIJKSTRA: '+g.dijk.dist.toFixed(3)+' mi, '+g.dijk.hops+' hops, '+g.dijk.visited+' nodes visited',
-    'A*:       '+g.astar.dist.toFixed(3)+' mi, '+g.astar.hops+' hops, '+g.astar.visited+' nodes visited',
-    'A* efficiency: '+Math.round(100*(g.dijk.visited-g.astar.visited)/Math.max(1,g.dijk.visited))+'% fewer nodes',
-    '',
-    'CRITICALITY RANKING:',
-    ...g.crit.map((c,i)=>'  '+(i+1)+'. '+c.road+' (score:'+c.score+', disconnects:'+c.disc+')'),
-    '',
-    'BRIDGE EDGES: '+g.bridges,
-  ];
-  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = g.name+'-results.txt';
-  a.click();
-  log('exported '+g.name+' results', 'ok');
+function resetGraph(){
+  removed.clear();
+  drawGraph();
+  log('network reset — all edges restored','g');
+  document.getElementById('animBtn').classList.remove('active-anim');
+  clearTimeout(animT);
 }
 
-// ─── Add graph modal ──────────────────────────────────────────────────────────
-function openModal() { document.getElementById('modalBg').classList.add('open'); }
-function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
+// ════════════════════════════════════════════
+// ALGO PANEL
+// ════════════════════════════════════════════
+function renderAlgo(){
+  const g=GRAPHS[CG];
+  document.getElementById('albl').textContent=g.name;
+  document.getElementById('dd').textContent=g.dijk.dist.toFixed(3)+' mi';
+  document.getElementById('dh').textContent=g.dijk.hops;
+  document.getElementById('dv').textContent=g.dijk.vis;
+  document.getElementById('ad').textContent=g.astar.dist.toFixed(3)+' mi';
+  document.getElementById('ah').textContent=g.astar.hops;
+  document.getElementById('av').textContent=g.astar.vis;
+  const eff=g.dijk.vis>0?Math.round(100*(g.dijk.vis-g.astar.vis)/g.dijk.vis):0;
+  document.getElementById('av').className='mv '+(eff>0?'better':'same');
+  document.getElementById('atag').textContent=eff>0?`${eff}% faster`:'same speed';
+  document.getElementById('efill').style.width=eff+'%';
+  document.getElementById('enum').textContent=eff+'%';
+  document.getElementById('esub').textContent=eff>0
+    ?`A* visited ${g.astar.vis} nodes vs Dijkstra's ${g.dijk.vis} — saving ${g.dijk.vis-g.astar.vis} node evaluations on ${g.name}`
+    :`Graph too small for A* to gain an advantage — both algorithms visit all ${g.dijk.vis} nodes`;
+  const vmap={};g.verts.forEach(v=>vmap[v.id]=v);
+  const pd=document.getElementById('pdisp');
+  pd.innerHTML='';
+  g.path.forEach((id,i)=>{
+    const v=vmap[id];
+    const sp=document.createElement('span');sp.className='pn2';
+    sp.title=v?.lbl||'';sp.textContent=(v?.lbl.split('@')[0].split('/')[0]||'?')+'#'+id;
+    pd.appendChild(sp);
+    if(i<g.path.length-1){const a=document.createElement('span');a.className='parr';a.textContent='→';pd.appendChild(a);}
+  });
+  const dr=document.getElementById('drows');
+  dr.innerHTML=`<div style="font-size:10px;color:var(--t3);font-family:var(--mono);margin-bottom:6px">baseline: Dijkstra ${g.dijk.vis} · A* ${g.astar.vis} nodes visited</div>`;
+  g.simSteps.forEach((s,i)=>{
+    const d=document.createElement('div');
+    d.style.cssText='display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--t2);padding:4px 0;border-bottom:1px solid var(--b0)';
+    d.innerHTML=`<span style="color:var(--a)">step ${i+1} — ${s.road} removed</span><span>${s.status==='DISC'?'<span style="color:var(--r)">network disconnected</span>':`D:${s.dv} A*:${s.av}`}</span>`;
+    dr.appendChild(d);
+  });
+}
 
-function parseAndAddGraph() {
-  const name = document.getElementById('modalName').value.trim() || 'graph-'+GRAPHS.length;
-  const output = document.getElementById('modalOutput').value;
-  const status = document.getElementById('modal-status');
-
-  // Parse key values from Java output
-  const Vmatch = output.match(/Graph\((\d+) vertices/);
-  const Ematch = output.match(/(\d+) edges\)/);
-  const distMatch = output.match(/Distance\s*:\s*([\d.]+)/);
-  const hopsMatch = output.match(/Hops\s*:\s*(\d+)/);
-  const visitedMatches = [...output.matchAll(/Visited\s*:\s*(\d+)/g)];
-  const bridgeMatch = output.match(/Bridge Edges.*?(\d+)\s*\n/);
-
-  if (!Vmatch || !distMatch) {
-    status.textContent = 'Could not parse output. Make sure you paste the full Java output.';
-    status.style.color = 'var(--accent4)';
-    return;
+// ════════════════════════════════════════════
+// FAILURE PANEL
+// ════════════════════════════════════════════
+function renderFail(){
+  const g=GRAPHS[CG];
+  const sl=document.getElementById('simSlider');
+  sl.max=g.simSteps.length;sl.value=0;
+  updSim(0);drawFailChart();renderIns();
+}
+function updSim(step){
+  const g=GRAPHS[CG];
+  document.getElementById('stepv').textContent=step===0?'baseline':`step ${step} / ${g.simSteps.length}`;
+  let html=`<tr class="base"><td>—</td><td>baseline</td><td style="color:var(--t3)">intact</td><td>${g.dijk.dist.toFixed(3)} mi</td><td>+0.000</td><td>${g.dijk.vis}</td><td>${g.astar.vis}</td><td><span class="otag">OK</span></td></tr>`;
+  for(let i=0;i<Math.min(step,g.simSteps.length);i++){
+    const s=g.simSteps[i],cur=i===step-1;
+    const cls=cur?'cur':s.status==='DISC'?'disc':'';
+    html+=`<tr class="${cls}"><td>${i+1}</td><td style="color:var(--a)">${s.road}</td><td style="color:var(--t3);font-size:9px">${s.edge.u}↔${s.edge.v} (${s.w}mi)</td>`;
+    html+=s.status==='DISC'
+      ?`<td style="color:var(--r)">N/A</td><td style="color:var(--r)">∞</td><td>—</td><td>—</td><td><span class="dtag">DISC</span></td>`
+      :`<td>${s.dist.toFixed(3)} mi</td><td style="color:var(--a)">+${s.delta.toFixed(3)}</td><td>${s.dv}</td><td>${s.av}</td><td><span class="otag">OK</span></td>`;
+    html+='</tr>';
   }
-
-  const V = parseInt(Vmatch[1]);
-  const E = Ematch ? parseInt(Ematch[1]) : 0;
-  const dist = parseFloat(distMatch[1]);
-  const hops = hopsMatch ? parseInt(hopsMatch[1]) : 0;
-  const dVisited = visitedMatches[0] ? parseInt(visitedMatches[0][1]) : 0;
-  const aVisited = visitedMatches[1] ? parseInt(visitedMatches[1][1]) : dVisited;
-  const bridges = bridgeMatch ? parseInt(bridgeMatch[1]) : 0;
-
-  // Parse path
-  const pathMatch = output.match(/Path\s*:\s*\[([^\]]+)\]/);
-  const path = pathMatch ? pathMatch[1].split(',').map(s=>parseInt(s.trim())) : [0,V-1];
-
-  // Parse crit edges
-  const critRows = [...output.matchAll(/\d+\s+([\w,]+)\s+[\w@*\/]+\s+[\w@*\/]+\s+[\d.]+\s+([\d.]+)\s+(\d+)/g)];
-  const crit = critRows.slice(0,15).map(m=>({
-    road:m[1], from:'—', to:'—', score:parseFloat(m[2]), disc:parseInt(m[3])
-  }));
-
-  // Build minimal graph
-  const newGraph = {
-    name, V, E, bridges,
-    vertices: path.map((id,i)=>({id,label:'V'+id,x:50+i*(450/Math.max(path.length-1,1)),y:240})),
-    edges: path.slice(0,-1).map((u,i)=>({u,v:path[i+1],road:'road',w:0.5})),
-    path, source:path[0], target:path[path.length-1],
-    dijk:{dist,hops,visited:dVisited},
-    astar:{dist,hops,visited:aVisited},
-    simSteps:[], crit
-  };
-
-  GRAPHS.push(newGraph);
-  buildGraphButtons();
-  selectGraph(GRAPHS.length-1);
-  closeModal();
-  log('added '+name+': '+V+'V '+E+'E', 'ok');
+  document.getElementById('sbody').innerHTML=html;
+  removed.clear();
+  const g2=GRAPHS[CG];
+  for(let i=0;i<step&&i<g2.simSteps.length;i++){
+    const s=g2.simSteps[i];
+    const idx=g2.edges.findIndex(e=>(e.u===s.edge.u&&e.v===s.edge.v)||(e.u===s.edge.v&&e.v===s.edge.u));
+    if(idx>=0)removed.add(idx);
+  }
+  if(CP==='graph')drawGraph();
+}
+function drawFailChart(){
+  const g=GRAPHS[CG];
+  const el=document.getElementById('fchart');
+  const W=el.parentElement.clientWidth-28,H=95;
+  el.setAttribute('width',W);el.setAttribute('height',H);
+  const s=d3.select('#fchart');s.selectAll('*').remove();
+  const labels=['Base',...g.simSteps.map((_,i)=>'S'+(i+1))];
+  const vals=[0,...g.simSteps.map(x=>x.status==='DISC'?null:x.delta||0)];
+  const n=labels.length,bw=Math.min(42,(W-40)/n*.6),gap=(W-40)/n;
+  const maxV=Math.max(...vals.filter(v=>v!=null),.1);
+  labels.forEach((lbl,i)=>{
+    const x=20+i*gap+(gap-bw)/2,v=vals[i];
+    if(v===null){
+      s.append('rect').attr('x',x).attr('y',6).attr('width',bw).attr('height',H-28).attr('fill','rgba(255,68,68,0.12)').attr('rx',3);
+      s.append('line').attr('x1',x+4).attr('y1',10).attr('x2',x+bw-4).attr('y2',H-32).attr('stroke','rgba(255,68,68,0.4)').attr('stroke-width',1);
+      s.append('line').attr('x1',x+bw-4).attr('y1',10).attr('x2',x+4).attr('y2',H-32).attr('stroke','rgba(255,68,68,0.4)').attr('stroke-width',1);
+      s.append('text').attr('x',x+bw/2).attr('y',H-30).attr('text-anchor','middle').attr('font-size',9).attr('font-family','JetBrains Mono,monospace').attr('fill','#ff4444').text('∞');
+    } else {
+      const bh=Math.max(2,(v/maxV)*(H-28));
+      s.append('rect').attr('x',x).attr('y',H-28-bh).attr('width',bw).attr('height',bh).attr('fill',i===0?'rgba(0,230,118,0.15)':'rgba(255,171,0,0.3)').attr('rx',3);
+      s.append('rect').attr('x',x).attr('y',H-28-bh).attr('width',bw).attr('height',1).attr('fill',i===0?'var(--g)':'var(--a)');
+      if(v>0)s.append('text').attr('x',x+bw/2).attr('y',H-32-bh).attr('text-anchor','middle').attr('font-size',9).attr('font-family','JetBrains Mono,monospace').attr('fill','var(--a)').text('+'+v.toFixed(2));
+    }
+    s.append('text').attr('x',x+bw/2).attr('y',H-10).attr('text-anchor','middle').attr('font-size',9).attr('font-family','JetBrains Mono,monospace').attr('fill','var(--t3)').text(lbl);
+  });
+  s.append('line').attr('x1',18).attr('y1',0).attr('x2',18).attr('y2',H-22).attr('stroke','var(--b1)').attr('stroke-width',.5);
+  s.append('line').attr('x1',18).attr('y1',H-22).attr('x2',W).attr('y2',H-22).attr('stroke','var(--b1)').attr('stroke-width',.5);
+}
+function renderIns(){
+  const g=GRAPHS[CG],b=document.getElementById('ins');
+  if(g.simSteps[0]?.status==='DISC'){
+    b.className='ins w';
+    b.innerHTML=`<strong>Bridge edge detected.</strong> Removing <strong>${g.simSteps[0].road}</strong> immediately disconnects the source–target pair with no alternative route available. This is a structural bridge — a single point of failure with criticality score ${g.crit.find(c=>c.road===g.simSteps[0].road)?.score?.toLocaleString()||'high'}.`;
+  } else {
+    b.className='ins i';
+    b.innerHTML=`Network degrades <strong>gradually</strong> under sequential failure. Use the slider to replay. Notice how A*'s heuristic becomes increasingly misleading as edges are removed — its node-visited count rises toward Dijkstra's as the heuristic loses accuracy.`;
+  }
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
-buildGraphButtons();
-selectGraph(0);
-log('dashboard initialized', 'info');
-log('siena-2mi loaded: 8V 6E', 'ok');
-log('siena-10mi loaded: 196V 240E', 'ok');
-log('dijkstra baseline: 4.953mi', 'ok');
-log('a* efficiency: 66.9% (10mi graph)', 'ok');
+// ════════════════════════════════════════════
+// CRIT PANEL
+// ════════════════════════════════════════════
+function renderCrit(){
+  const g=GRAPHS[CG];
+  document.getElementById('clbl').textContent=`${g.name} · ${g.crit.length} edges ranked`;
+  const max=g.crit[0]?.score||1;
+  document.getElementById('critList').innerHTML=g.crit.map((c,i)=>{
+    const pct=Math.round(c.score/max*100);
+    const clr=i<2?'var(--r)':i<5?'var(--a)':'var(--c)';
+    return `<div class="crow" title="${c.from} ↔ ${c.to}">
+      <span class="cr">${i+1}</span>
+      <span class="cro" style="color:${clr}">${c.road}</span>
+      <div class="cbg"><div class="cfill" style="width:${pct}%;background:${clr}"></div></div>
+      <span class="csc">${c.score>=1000?(c.score/1000).toFixed(0)+'k':c.score}</span>
+      <span class="cdc" style="color:${c.disc>0?'var(--r)':'var(--t3)'}">${c.disc>0?c.disc+'×':'—'}</span>
+    </div>`;
+  }).join('');
+  const bridges=g.crit.filter(c=>c.disc>0);
+  document.getElementById('brrows').innerHTML=bridges.map(c=>
+    `<div class="brrow"><span>${c.road}</span><span style="color:var(--t2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin:0 6px">${c.from.split('@')[0]}↔${c.to.split('@')[0]}</span><span>${c.disc}×</span></div>`
+  ).join('');
+}
 
-window.addEventListener('resize', ()=>{ if(currentPanel==='graph') drawGraph(); });
-document.getElementById('modalBg').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+// ════════════════════════════════════════════
+// EXPORT
+// ════════════════════════════════════════════
+function exportTxt(){
+  const g=GRAPHS[CG];
+  const eff=g.dijk.vis>0?Math.round(100*(g.dijk.vis-g.astar.vis)/g.dijk.vis):0;
+  const lines=[
+    'TRANSPORTATION NETWORK RESILIENCE ANALYSIS',
+    'CSIS 385 — Donnelly & Majtyka — Spring 2026',
+    '='.repeat(60),'',
+    `Graph    : ${g.name}`,
+    `Vertices : ${g.V}   Edges : ${g.E}   Bridges : ${g.bridges}`,``,
+    'ALGORITHM COMPARISON (intact network):',
+    `  Dijkstra : dist=${g.dijk.dist.toFixed(3)}mi  hops=${g.dijk.hops}  visited=${g.dijk.vis}`,
+    `  A*       : dist=${g.astar.dist.toFixed(3)}mi  hops=${g.astar.hops}  visited=${g.astar.vis}`,
+    `  Efficiency: A* explored ${eff}% fewer nodes`,``,
+    'SHORTEST PATH:','  '+g.path.join(' → '),``,
+    'CRITICALITY RANKING:',
+    ...g.crit.map((c,i)=>`  ${String(i+1).padStart(2)}. ${c.road.padEnd(14)} score:${String(c.score).padStart(8)}  disc:${c.disc}`),``,
+    'BRIDGE EDGES:',
+    ...g.crit.filter(c=>c.disc>0).map(c=>`  [${c.road}] ${c.from} ↔ ${c.to}  (${c.disc} pairs disconnected)`),
+  ];
+  const blob=new Blob([lines.join('\n')],{type:'text/plain'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  a.download=g.name+'-analysis.txt';a.click();
+  log(`exported ${g.name}`,'g');
+}
+
+// ════════════════════════════════════════════
+// MODAL
+// ════════════════════════════════════════════
+function openModal(){document.getElementById('mbg').classList.add('open');}
+function closeModal(){document.getElementById('mbg').classList.remove('open');}
+function parseAdd(){
+  const name=document.getElementById('mname').value.trim()||'graph-'+GRAPHS.length;
+  const out=document.getElementById('mout').value;
+  const st=document.getElementById('mst');
+  const Vm=out.match(/Graph\((\d+) vertices/),Em=out.match(/(\d+) edges\)/);
+  const dm=out.match(/Distance\s*:\s*([\d.]+)/),hm=out.match(/Hops\s*:\s*(\d+)/);
+  const va=[...out.matchAll(/Visited\s*:\s*(\d+)/g)];
+  if(!Vm||!dm){st.style.color='var(--r)';st.textContent='Parse failed — paste the full Java output.';return;}
+  const V=parseInt(Vm[1]),E=Em?parseInt(Em[1]):0;
+  const dist=parseFloat(dm[1]),hops=hm?parseInt(hm[1]):0;
+  const dv=va[0]?parseInt(va[0][1]):0,av=va[1]?parseInt(va[1][1]):dv;
+  const pm=out.match(/Path\s*:\s*\[([^\]]+)\]/);
+  const path=pm?pm[1].split(',').map(s=>parseInt(s.trim())):[0,V-1];
+  const cr=[...out.matchAll(/^\s*(\d+)\s+([\w,.-]+)\s+([\w@*\/.-]+)\s+([\w@*\/.-]+)\s+[\d.]+\s+([\d.]+)\s+(\d+)/mg)];
+  const crit=cr.slice(0,15).map(m=>({road:m[2],from:m[3],to:m[4],score:parseFloat(m[5]),disc:parseInt(m[6])}));
+  const verts=path.map((id,i)=>({id,lbl:'V'+id,lat:42.7+i*0.025,lon:-73.75+i*0.02}));
+  const edges=path.slice(0,-1).map((u,i)=>({u,v:path[i+1],road:'road',w:0.5}));
+  const bridges=out.match(/\(disconnects \d+ pairs\)/g)?.length||0;
+  GRAPHS.push({name,V,E,bridges,verts,edges,path,src:path[0],tgt:path[path.length-1],
+    dijk:{dist,hops,vis:dv},astar:{dist,hops,vis:av},simSteps:[],crit});
+  buildBtns();selG(GRAPHS.length-1);closeModal();
+  st.style.color='var(--g)';st.textContent='Added!';
+  log(`added ${name}: ${V}V ${E}E`,'g');
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+buildBtns();updChips();
+setTimeout(drawGraph,50);
+document.getElementById('mbg').addEventListener('click',function(e){if(e.target===this)closeModal();});
+window.addEventListener('resize',()=>{if(CP==='graph')drawGraph();if(CP==='fail')drawFailChart();});
+log('dashboard ready','g');
+log('siena-2mi: 8V 6E all-bridge chain topology','c');
+log('siena-10mi: 196V 240E · A* 66.9% efficiency gain','c');
+log('use "random failure!" to break random edges','a');
+log('enable click-to-remove to click edges directly','a');
 </script>
 </body>
 </html>
