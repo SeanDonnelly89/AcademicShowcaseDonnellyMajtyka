@@ -364,11 +364,14 @@ tr.disc td{color:var(--r)}
 </div>
 
 <div class="mbg" id="mbg">
-  <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal" onclick="event.stopPropagation()" style="width:560px">
     <h2>Add graph dataset</h2>
-    <p>Paste your Java output. The dashboard auto-parses V, E, path, distances, visited counts, and criticality scores.</p>
-    <input type="text" id="mname" placeholder="Graph name (e.g. siena-3mi)">
-    <textarea id="mout" placeholder="Paste Java output here…"></textarea>
+    <p>Paste your Java output <strong>and</strong> your <code>.tmg</code> file contents below. The TMG data provides real coordinates so the graph renders as an actual road map.</p>
+    <input type="text" id="mname" placeholder="Graph name (e.g. nyc-20mi)">
+    <label style="font-size:10px;color:var(--t3);font-family:var(--mono);display:block;margin-bottom:4px;letter-spacing:.8px">JAVA OUTPUT</label>
+    <textarea id="mout" placeholder="Paste Java program output here…" style="height:120px"></textarea>
+    <label style="font-size:10px;color:var(--t3);font-family:var(--mono);display:block;margin-bottom:4px;letter-spacing:.8px">.TMG FILE CONTENTS (paste for real coordinates)</label>
+    <textarea id="mtmg" placeholder="Paste full .tmg file contents here…" style="height:120px"></textarea>
     <div class="mst" id="mst"></div>
     <div class="mbtns">
       <button class="mb2" onclick="closeModal()">Cancel</button>
@@ -1080,7 +1083,9 @@ function closeModal(){document.getElementById('mbg').classList.remove('open');}
 function parseAdd(){
   const name=document.getElementById('mname').value.trim()||'graph-'+GRAPHS.length;
   const out=document.getElementById('mout').value;
+  const tmgRaw=document.getElementById('mtmg').value.trim();
   const st=document.getElementById('mst');
+
   const Vm=out.match(/Graph\((\d+) vertices/),Em=out.match(/(\d+) edges\)/);
   const dm=out.match(/Distance\s*:\s*([\d.]+)/),hm=out.match(/Hops\s*:\s*(\d+)/);
   const va=[...out.matchAll(/Visited\s*:\s*(\d+)/g)];
@@ -1092,14 +1097,75 @@ function parseAdd(){
   const path=pm?pm[1].split(',').map(s=>parseInt(s.trim())):[0,V-1];
   const cr=[...out.matchAll(/^\s*(\d+)\s+([\w,.-]+)\s+([\w@*\/.-]+)\s+([\w@*\/.-]+)\s+[\d.]+\s+([\d.]+)\s+(\d+)/mg)];
   const crit=cr.slice(0,15).map(m=>({road:m[2],from:m[3],to:m[4],score:parseFloat(m[5]),disc:parseInt(m[6])}));
-  const verts=path.map((id,i)=>({id,lbl:'V'+id,lat:42.7+i*0.025,lon:-73.75+i*0.02}));
-  const edges=path.slice(0,-1).map((u,i)=>({u,v:path[i+1],road:'road',w:0.5}));
   const bridges=out.match(/\(disconnects \d+ pairs\)/g)?.length||0;
+
+  let verts=[], edges=[];
+
+  if(tmgRaw){
+    // Parse real coordinates and edges from TMG file
+    const lines=tmgRaw.split('\n').map(l=>l.trim()).filter(Boolean);
+    // Line 0: "TMG 1.0 ..."
+    // Line 1: "numVertices numEdges"
+    const hdrMatch=lines[1]?.match(/^(\d+)\s+(\d+)/);
+    const numV=hdrMatch?parseInt(hdrMatch[1]):V;
+    const numE=hdrMatch?parseInt(hdrMatch[2]):0;
+
+    // Vertices: lines 2 .. 2+numV-1  → "label lat lon"
+    const vertMap={};
+    for(let i=0;i<numV;i++){
+      const parts=lines[2+i]?.split(/\s+/);
+      if(!parts||parts.length<3) continue;
+      const lbl=parts[0];
+      const lat=parseFloat(parts[1]);
+      const lon=parseFloat(parts[2]);
+      vertMap[i]={id:i,lbl,lat,lon};
+    }
+
+    // Edges: lines 2+numV .. end → "u v roadname [extra coords...]"
+    for(let i=2+numV;i<lines.length;i++){
+      const parts=lines[i].split(/\s+/);
+      if(parts.length<3) continue;
+      const u=parseInt(parts[0]),v=parseInt(parts[1]),road=parts[2];
+      if(isNaN(u)||isNaN(v)) continue;
+      // Compute haversine distance between u and v
+      const vu=vertMap[u],vv=vertMap[v];
+      let w=0.5;
+      if(vu&&vv){
+        const R=3958.8;
+        const dLat=(vv.lat-vu.lat)*Math.PI/180;
+        const dLon=(vv.lon-vu.lon)*Math.PI/180;
+        const a=Math.sin(dLat/2)**2+Math.cos(vu.lat*Math.PI/180)*Math.cos(vv.lat*Math.PI/180)*Math.sin(dLon/2)**2;
+        w=R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+        w=Math.round(w*1000)/1000;
+      }
+      edges.push({u,v,road,w});
+    }
+
+    // Build verts array — include all vertices that appear in edges or path
+    const usedIds=new Set([...edges.flatMap(e=>[e.u,e.v]),...path]);
+    verts=Object.values(vertMap).filter(v=>usedIds.has(v.id));
+
+    st.style.color='var(--g)';
+    st.textContent=`Parsed ${verts.length} vertices, ${edges.length} edges from TMG.`;
+  } else {
+    // Fallback: no TMG — use fake coords (old behavior, warns user)
+    verts=path.map((id,i)=>({id,lbl:'V'+id,lat:40.7+i*0.025,lon:-74.0+i*0.02}));
+    edges=path.slice(0,-1).map((u,i)=>({u,v:path[i+1],road:'road',w:0.5}));
+    st.style.color='var(--a)';
+    st.textContent='No TMG pasted — using placeholder coords. Graph will render as a line.';
+  }
+
+  // Build simSteps from path edges
+  const simSteps=path.slice(0,-1).map((u,i)=>{
+    const v2=path[i+1];
+    const e=edges.find(e=>(e.u===u&&e.v===v2)||(e.v===u&&e.u===v2));
+    return {edge:{u,v:v2},road:e?.road||'road',w:e?.w||0.5,dist:null,delta:null,dv:null,av:null,status:'DISC'};
+  });
+
   GRAPHS.push({name,V,E,bridges,verts,edges,path,src:path[0],tgt:path[path.length-1],
-    dijk:{dist,hops,vis:dv},astar:{dist,hops,vis:av},simSteps:[],crit});
+    dijk:{dist,hops,vis:dv},astar:{dist,hops,vis:av},simSteps,crit});
   buildBtns();selG(GRAPHS.length-1);closeModal();
-  st.style.color='var(--g)';st.textContent='Added!';
-  log(`added ${name}: ${V}V ${E}E`,'g');
+  log(`added ${name}: ${V}V ${E}E · TMG:${tmgRaw?'yes':'no'}`,'g');
 }
 
 // ════════════════════════════════════════════
