@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Resilience Analyzer — CSIS 385</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Playfair+Display:wght@400;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0d0f;--bg2:#111417;--bg3:#181c20;--bg4:#1e2328;
+  --border:#2a3038;--border2:#3a424c;
+  --text:#e8eaed;--text2:#8c95a0;--text3:#5a6370;
+  --accent:#4ade80;--accent2:#22d3ee;--accent3:#f59e0b;--accent4:#f87171;--accent5:#a78bfa;
+  --mono:'DM Mono',monospace;--serif:'Playfair Display',serif;--sans:'DM Sans',sans-serif;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;display:flex;flex-direction:column}
+
+/* ── Header ── */
+.header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.header-left{display:flex;align-items:center;gap:14px}
+.logo{width:34px;height:34px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.logo svg{width:19px;height:19px;stroke:#0a0d0f;fill:none;stroke-width:2.2}
+h1{font-family:var(--serif);font-size:20px;font-weight:600;letter-spacing:-0.3px}
+.header-meta{font-size:11px;color:var(--text3);margin-top:2px}
+.badge{font-size:10px;font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:3px 8px;color:var(--accent);white-space:nowrap}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;margin-right:5px;animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── Layout ── */
+.main{display:grid;grid-template-columns:210px 1fr 230px;flex:1;min-height:0;overflow:hidden}
+
+/* ── Sidebar ── */
+.sidebar{border-right:1px solid var(--border);padding:14px 12px;display:flex;flex-direction:column;gap:6px;overflow-y:auto}
+.sidebar-label{font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.2px;text-transform:uppercase;margin:10px 2px 6px}
+.nav-item{padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text2);display:flex;align-items:center;gap:8px;transition:all 0.13s;border:1px solid transparent;user-select:none}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--bg3);color:var(--accent);border-color:var(--border)}
+.nav-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.graph-btn{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text2);background:var(--bg2);border:1px solid var(--border);transition:all 0.13s;text-align:left;width:100%;margin-bottom:4px}
+.graph-btn:hover{border-color:var(--border2);color:var(--text)}
+.graph-btn.active{border-color:var(--accent);color:var(--accent);background:rgba(74,222,128,0.06)}
+.graph-btn small{display:block;font-size:10px;color:var(--text3);margin-top:2px}
+.add-btn{padding:8px 10px;border-radius:7px;cursor:pointer;font-size:12px;font-family:var(--mono);color:var(--text3);background:transparent;border:1px dashed var(--border);transition:all 0.13s;text-align:left;width:100%;margin-top:2px}
+.add-btn:hover{border-color:var(--border2);color:var(--text2)}
+.sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}
+.ask-btn{background:transparent;border:1px solid var(--border2);border-radius:6px;padding:7px 10px;color:var(--text2);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.13s;font-family:var(--sans);width:100%;text-align:left}
+.ask-btn:hover{border-color:var(--accent);color:var(--accent);background:rgba(74,222,128,0.04)}
+
+/* ── Content area ── */
+.content{overflow:hidden;display:flex;flex-direction:column;min-height:0}
+.panel{display:none;flex-direction:column;height:100%;overflow:hidden}
+.panel.active{display:flex}
+
+/* ── Graph panel ── */
+.graph-panel-inner{flex:1;display:flex;flex-direction:column;padding:16px;gap:12px;overflow:hidden}
+.graph-toolbar{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.toolbar-btn{padding:5px 12px;border-radius:5px;cursor:pointer;font-size:11px;font-family:var(--mono);color:var(--text2);background:var(--bg2);border:1px solid var(--border);transition:all 0.12s}
+.toolbar-btn:hover{border-color:var(--border2);color:var(--text)}
+.toolbar-btn.active{border-color:var(--accent2);color:var(--accent2)}
+.canvas-wrap{flex:1;min-height:0;position:relative}
+#netCanvas{width:100%;height:100%;border-radius:8px;background:var(--bg2);border:1px solid var(--border);display:block}
+.canvas-legend{position:absolute;bottom:10px;left:10px;display:flex;gap:12px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text3);font-family:var(--mono)}
+.legend-dot{width:8px;height:8px;border-radius:50%}
+
+/* ── Algo panel ── */
+.algo-compare{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;height:100%}
+.section-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.section-title{font-size:10px;font-family:var(--mono);color:var(--text3);letter-spacing:1.2px;text-transform:uppercase}
+.algo-cards{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.algo-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px}
+.algo-card.winner{border-color:rgba(74,222,128,0.4);background:rgba(74,222,128,0.03)}
+.algo-name{font-size:14px;font-weight:500;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.algo-sub{font-size:10px;color:var(--text3);margin-bottom:12px;font-family:var(--mono)}
+.algo-tag{font-size:9px;font-family:var(--mono);background:var(--bg3);border-radius:3px;padding:2px 5px;color:var(--text3)}
+.algo-tag.win{background:rgba(74,222,128,0.15);color:var(--accent)}
+.metric-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)}
+.metric-row:last-child{border-bottom:none}
+.metric-label{font-size:11px;color:var(--text2)}
+.metric-val{font-family:var(--mono);font-size:12px;color:var(--text)}
+.metric-val.better{color:var(--accent)}
+.metric-val.same{color:var(--text3)}
+.path-viz{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:13px}
+.path-nodes{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.path-node{font-size:10px;font-family:var(--mono);background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:2px 6px;color:var(--accent2)}
+.path-arrow{color:var(--text3);font-size:10px}
+.eff-bar-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:13px}
+.eff-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.eff-fill{height:100%;background:var(--accent);border-radius:4px;transition:width 0.7s cubic-bezier(0.4,0,0.2,1)}
+
+/* ── Failure panel ── */
+.failure-inner{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;height:100%}
+.sim-controls{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.sim-controls label{font-size:11px;color:var(--text2);white-space:nowrap}
+.sim-controls input[type=range]{flex:1;accent-color:var(--accent);cursor:pointer}
+.sim-step-val{font-family:var(--mono);font-size:13px;color:var(--accent);min-width:30px;text-align:right}
+.sim-table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:auto;flex-shrink:0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:9px 12px;text-align:left;font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:8px 12px;border-bottom:1px solid var(--border);font-family:var(--mono);color:var(--text2)}
+tr:last-child td{border-bottom:none}
+tr.row-baseline td{color:var(--text3)}
+tr.row-ok td{color:var(--text)}
+tr.row-disc td{color:var(--accent4)}
+tr.row-current{background:rgba(74,222,128,0.05)}
+tr.row-current td{color:var(--accent)}
+.tag-ok{color:var(--accent);font-size:9px}
+.tag-disc{color:var(--accent4);font-size:9px}
+.chart-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;flex-shrink:0}
+.chart-label{font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px}
+#failCanvas{width:100%;display:block;border-radius:4px}
+
+/* ── Criticality panel ── */
+.crit-inner{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;height:100%}
+.crit-list{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.crit-item{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;cursor:pointer;transition:background 0.12s}
+.crit-item:hover{background:var(--bg3)}
+.crit-item:last-child{border-bottom:none}
+.crit-rank{font-family:var(--mono);font-size:11px;color:var(--text3);width:18px;text-align:right;flex-shrink:0}
+.crit-road{font-family:var(--mono);font-size:11px;color:var(--accent3);flex-shrink:0;width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crit-bar-bg{flex:1;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.crit-bar-fill{height:100%;border-radius:3px;transition:width 0.5s}
+.crit-score{font-family:var(--mono);font-size:11px;color:var(--text2);width:50px;text-align:right;flex-shrink:0}
+.crit-disc{font-size:10px;color:var(--accent4);font-family:var(--mono);flex-shrink:0;width:30px;text-align:right}
+.bridge-box{background:rgba(248,113,113,0.05);border:1px solid rgba(248,113,113,0.2);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)}
+.bridge-box-title{color:var(--accent4);font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px}
+.bridge-list{display:flex;flex-direction:column;gap:4px;margin-top:8px;max-height:160px;overflow-y:auto}
+.bridge-row{font-size:11px;font-family:var(--mono);color:var(--text2);padding:4px 0;border-bottom:1px solid rgba(248,113,113,0.1);display:flex;justify-content:space-between}
+.bridge-row:last-child{border-bottom:none}
+
+/* ── Right panel ── */
+.right-panel{border-left:1px solid var(--border);padding:14px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:11px 13px}
+.stat-label{font-size:9px;font-family:var(--mono);color:var(--text3);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:5px}
+.stat-value{font-size:22px;font-weight:500;font-family:var(--mono)}
+.stat-value.green{color:var(--accent)}
+.stat-value.amber{color:var(--accent3)}
+.stat-value.red{color:var(--accent4)}
+.stat-value.blue{color:var(--accent2)}
+.stat-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.mini-bar{margin-top:7px}
+.mini-bar-labels{display:flex;justify-content:space-between;font-size:9px;color:var(--text3);margin-bottom:3px}
+.mini-bar-bg{height:3px;background:var(--bg3);border-radius:2px;overflow:hidden}
+.mini-bar-fill{height:100%;border-radius:2px;transition:width 0.5s}
+.log-box{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;flex:1;overflow-y:auto;min-height:80px}
+.log-line{font-size:10px;font-family:var(--mono);padding:1px 0;line-height:1.7}
+.log-line.ok{color:var(--accent)}
+.log-line.warn{color:var(--accent3)}
+.log-line.err{color:var(--accent4)}
+.log-line.info{color:var(--accent2)}
+.log-line.muted{color:var(--text3)}
+
+/* ── Modal for adding graphs ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:24px;width:500px;max-width:90vw}
+.modal h2{font-family:var(--serif);font-size:18px;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--text2);margin-bottom:16px}
+.modal textarea{width:100%;height:200px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:10px;font-family:var(--mono);font-size:11px;color:var(--text);resize:vertical;margin-bottom:4px}
+.modal input[type=text]{width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:12px;color:var(--text);margin-bottom:12px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.modal-btn{padding:8px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-family:var(--sans);border:1px solid var(--border2);background:transparent;color:var(--text2);transition:all 0.13s}
+.modal-btn.primary{background:var(--accent);color:#0a0d0f;border-color:var(--accent);font-weight:500}
+.modal-btn:hover{background:var(--bg3)}
+.modal-btn.primary:hover{background:#22c55e}
+
+/* ── Edge removal animation ── */
+.removal-flash{animation:flash 0.4s ease}
+@keyframes flash{0%{opacity:1}50%{opacity:0.2}100%{opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><line x1="12" y1="3" x2="12" y2="9"/><line x1="12" y1="15" x2="12" y2="21"/><line x1="3" y1="12" x2="9" y2="12"/><line x1="15" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="9.2" y2="9.2"/><line x1="14.8" y1="14.8" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="14.8" y2="9.2"/><line x1="9.2" y1="14.8" x2="5.6" y2="18.4"/></svg>
+    </div>
+    <div>
+      <h1>Network Resilience Analyzer</h1>
+      <div class="header-meta"><span class="status-dot"></span>CSIS 385 &mdash; Donnelly &amp; Majtyka &mdash; Spring 2026 &mdash; METAL Dataset</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center">
+    <span class="badge" id="graph-badge">2mi &middot; 8V &middot; 6E</span>
+    <span class="badge" style="color:var(--accent2)" id="path-badge">path: 4.953mi &middot; 5 hops</span>
+  </div>
+</div>
+
+<!-- Main layout -->
+<div class="main">
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-label">Analysis</div>
+    <div class="nav-item active" onclick="switchPanel('graph')"><span class="nav-dot"></span>Network graph</div>
+    <div class="nav-item" onclick="switchPanel('algo')"><span class="nav-dot"></span>Algorithm comparison</div>
+    <div class="nav-item" onclick="switchPanel('failure')"><span class="nav-dot"></span>Failure simulation</div>
+    <div class="nav-item" onclick="switchPanel('crit')"><span class="nav-dot"></span>Criticality ranking</div>
+
+    <div class="sidebar-label">Datasets</div>
+    <div id="graphButtons"></div>
+    <button class="add-btn" onclick="openModal()">+ add graph&hellip;</button>
+
+    <div class="sidebar-footer">
+      <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:2px">Quick actions</div>
+      <button class="ask-btn" onclick="animateEdgeRemoval()">▶ animate removal</button>
+      <button class="ask-btn" onclick="toggleShowAllLabels()">◈ toggle labels</button>
+      <button class="ask-btn" onclick="exportResults()">↓ export results</button>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- Graph panel -->
+    <div class="panel active" id="panel-graph">
+      <div class="graph-panel-inner">
+        <div class="graph-toolbar">
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase">View</span>
+          <div class="toolbar-btn active" id="btn-path" onclick="setView('path',this)">shortest path</div>
+          <div class="toolbar-btn" id="btn-all" onclick="setView('all',this)">all edges</div>
+          <div class="toolbar-btn" id="btn-crit" onclick="setView('crit',this)">critical edges</div>
+          <div class="toolbar-btn" id="btn-failure" onclick="setView('failure',this)">post-failure</div>
+          <span style="margin-left:auto;font-size:10px;color:var(--text3);font-family:var(--mono)" id="graph-desc">intact network</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="netCanvas"></canvas>
+          <div class="canvas-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>source/target</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>path node</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>critical edge</div>
+            <div class="legend-item"><div class="legend-dot" style="background:var(--border2)"></div>inactive</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Algo panel -->
+    <div class="panel" id="panel-algo">
+      <div class="algo-compare">
+        <div class="section-header">
+          <span class="section-title">Algorithm Comparison &mdash; intact network</span>
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="algo-graph-label"></span>
+        </div>
+        <div class="algo-cards">
+          <div class="algo-card">
+            <div class="algo-name">Dijkstra's <span class="algo-tag">Baseline</span></div>
+            <div class="algo-sub">Explores all nodes uniformly &middot; O((V+E) log V)</div>
+            <div class="metric-row"><span class="metric-label">Distance</span><span class="metric-val" id="d-dist">—</span></div>
+            <div class="metric-row"><span class="metric-label">Hops</span><span class="metric-val" id="d-hops">—</span></div>
+            <div class="metric-row"><span class="metric-label">Nodes visited</span><span class="metric-val" id="d-visited">—</span></div>
+            <div class="metric-row"><span class="metric-label">Heuristic</span><span class="metric-val" style="color:var(--text3)">none</span></div>
+          </div>
+          <div class="algo-card winner">
+            <div class="algo-name">A* Search <span class="algo-tag win" id="astar-tag">—</span></div>
+            <div class="algo-sub">Geographic heuristic (Haversine) &middot; prunes search space</div>
+            <div class="metric-row"><span class="metric-label">Distance</span><span class="metric-val" id="a-dist">—</span></div>
+            <div class="metric-row"><span class="metric-label">Hops</span><span class="metric-val" id="a-hops">—</span></div>
+            <div class="metric-row"><span class="metric-label">Nodes visited</span><span class="metric-val better" id="a-visited">—</span></div>
+            <div class="metric-row"><span class="metric-label">Heuristic</span><span class="metric-val" style="color:var(--accent2)">Haversine distance</span></div>
+          </div>
+        </div>
+        <div class="path-viz">
+          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px">Shortest path &mdash; vertex sequence</div>
+          <div class="path-nodes" id="path-display"></div>
+        </div>
+        <div class="eff-bar-wrap">
+          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:8px">Nodes explored &mdash; A* vs Dijkstra</div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="eff-track"><div class="eff-fill" id="eff-bar" style="width:0%"></div></div>
+            <span id="eff-pct" style="font-family:var(--mono);font-size:16px;color:var(--accent);min-width:50px;text-align:right">0%</span>
+          </div>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px" id="eff-note">fewer nodes explored by A* vs Dijkstra</div>
+        </div>
+        <!-- Per-failure algo comparison -->
+        <div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:13px">
+          <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:0.8px;text-transform:uppercase;margin-bottom:10px">A* heuristic degradation under failure</div>
+          <div id="failure-algo-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Failure simulation panel -->
+    <div class="panel" id="panel-failure">
+      <div class="failure-inner">
+        <div class="section-header">
+          <span class="section-title">Progressive Edge Failure Simulation</span>
+        </div>
+        <div class="sim-controls">
+          <label>Removal step</label>
+          <input type="range" min="0" id="simSlider" value="0" oninput="updateSim(this.value)">
+          <span class="sim-step-val" id="simStepVal">baseline</span>
+        </div>
+        <div class="sim-table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Edge removed</th><th>Road</th><th>Dijkstra dist</th><th>&Delta; dist</th><th>A* visited</th><th>D visited</th><th>Status</th></tr></thead>
+            <tbody id="simTbody"></tbody>
+          </table>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart-label">Distance increase over baseline (miles)</div>
+          <canvas id="failCanvas" height="90"></canvas>
+        </div>
+        <div id="failure-insight" style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;font-size:12px;color:var(--text2)"></div>
+      </div>
+    </div>
+
+    <!-- Criticality panel -->
+    <div class="panel" id="panel-crit">
+      <div class="crit-inner">
+        <div class="section-header">
+          <span class="section-title">Edge Criticality Ranking</span>
+          <span style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="crit-label"></span>
+        </div>
+        <div class="crit-list" id="critList"></div>
+        <div class="bridge-box">
+          <div class="bridge-box-title">Bridge Edges &mdash; removal disconnects network</div>
+          <div id="bridge-desc" style="font-size:12px;color:var(--text2)"></div>
+          <div class="bridge-list" id="bridge-list"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right panel -->
+  <div class="right-panel">
+    <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase">Network stats</div>
+    <div class="stat-card">
+      <div class="stat-label">Vertices</div>
+      <div class="stat-value green" id="stat-v">—</div>
+      <div class="stat-sub">road intersections</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Edges</div>
+      <div class="stat-value blue" id="stat-e">—</div>
+      <div class="stat-sub">road segments</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Bridge edges</div>
+      <div class="stat-value red" id="stat-b">—</div>
+      <div class="stat-sub">cause disconnection if removed</div>
+      <div class="mini-bar">
+        <div class="mini-bar-labels"><span>of total edges</span><span id="bridge-pct">—</span></div>
+        <div class="mini-bar-bg"><div class="mini-bar-fill" id="bridge-bar" style="width:0%;background:var(--accent4)"></div></div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">A* efficiency</div>
+      <div class="stat-value amber" id="stat-eff">—</div>
+      <div class="stat-sub">fewer nodes explored vs Dijkstra</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Most critical road</div>
+      <div style="font-family:var(--mono);font-size:13px;color:var(--accent3);margin-top:4px" id="stat-crit">—</div>
+      <div class="stat-sub" id="stat-crit-sub">—</div>
+    </div>
+    <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-top:2px">Activity log</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+</div>
+
+<!-- Add graph modal -->
+<div class="modal-bg" id="modalBg" onclick="e=>{if(e.target===this)closeModal()}">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h2>Add graph dataset</h2>
+    <p>Paste your Java program output below. The dashboard will parse the results automatically.</p>
+    <input type="text" id="modalName" placeholder="Graph name (e.g. siena-3mi)">
+    <textarea id="modalOutput" placeholder="Paste Java output here...&#10;&#10;Example:&#10;Loaded: Graph(196 vertices, 240 edges)&#10;Distance : 18.074 miles&#10;Hops     : 19&#10;Visited  : 172 nodes&#10;..."></textarea>
+    <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-bottom:12px" id="modal-status"></div>
+    <div class="modal-btns">
+      <button class="modal-btn" onclick="closeModal()">Cancel</button>
+      <button class="modal-btn primary" onclick="parseAndAddGraph()">Add graph</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Data ──────────────────────────────────────────────────────────────────────
+const GRAPHS = [
+  {
+    name:'siena-2mi',
+    V:8, E:6, bridges:6,
+    vertices:[
+      {id:0,label:'NY2@DelRd',x:420,y:80},
+      {id:1,label:'NY155@DelRd',x:320,y:145},
+      {id:2,label:'NY155@LinAve',x:220,y:200},
+      {id:3,label:'NY155/US9',x:145,y:130},
+      {id:4,label:'US9@FidLn',x:110,y:240},
+      {id:5,label:'NY377/NY378',x:215,y:340},
+      {id:6,label:'NY378@MenRd',x:310,y:395},
+      {id:7,label:'NY378/US9',x:120,y:320}
+    ],
+    edges:[
+      {u:7,v:4,road:'US9',w:1.069},{u:4,v:3,road:'US9',w:1.186},
+      {u:3,v:1,road:'NY155',w:1.393},{u:1,v:2,road:'NY155',w:1.207},
+      {u:7,v:5,road:'NY378',w:0.915},{u:5,v:6,road:'NY378',w:0.390}
+    ],
+    path:[1,3,4,7,5,6],
+    source:1, target:6,
+    dijk:{dist:4.953,hops:5,visited:7},
+    astar:{dist:4.953,hops:5,visited:7},
+    simSteps:[
+      {edge:{u:3,v:1},road:'NY155',dist:null,delta:null,dVisited:null,aVisited:null,status:'DISCONNECTED'}
+    ],
+    crit:[
+      {road:'US9',from:'US9@FidLn',to:'NY155/US9',score:24000,disc:24},
+      {road:'US9',from:'NY378/US9',to:'US9@FidLn',score:24000,disc:24},
+      {road:'NY155',from:'NY155/US9',to:'NY155@DelRd',score:20000,disc:20},
+      {road:'NY378',from:'NY378/US9',to:'NY377/NY378',score:20000,disc:20},
+      {road:'NY155',from:'NY155@DelRd',to:'NY155@LinAve',score:12000,disc:12},
+      {road:'NY378',from:'NY377/NY378',to:'NY378@MenRd',score:12000,disc:12}
+    ]
+  },
+  {
+    name:'siena-10mi',
+    V:196, E:240, bridges:14,
+    vertices:[
+      {id:0,label:'NY40@FogRd',x:470,y:30},
+      {id:18,label:'NY40@CR116',x:440,y:60},
+      {id:33,label:'NY40_N/NY142_S',x:400,y:85},
+      {id:32,label:'NY40_S/NY142_N',x:390,y:90},
+      {id:57,label:'NY7/NY40',x:355,y:125},
+      {id:49,label:'I-787/NY7@8thSt',x:310,y:175},
+      {id:47,label:'I-787/NY7@6thAve',x:305,y:185},
+      {id:50,label:'I-787(9)/NY7/NY787',x:290,y:210},
+      {id:48,label:'I-787@8',x:300,y:225},
+      {id:92,label:'I-787(7)/NY378',x:265,y:255},
+      {id:91,label:'I-787@6',x:275,y:270},
+      {id:121,label:'I-90@6A&I-787@5',x:255,y:305},
+      {id:130,label:'I-90(6)/US9',x:230,y:335},
+      {id:153,label:'US9/US9W',x:205,y:360},
+      {id:137,label:'NY5/US9W',x:185,y:385},
+      {id:151,label:'US20/NY443/US9W',x:170,y:405},
+      {id:150,label:'NY443/US9W@MorAve',x:155,y:425},
+      {id:152,label:'NY443_W/US9W',x:140,y:445},
+      {id:163,label:'NY335/NY443',x:120,y:465},
+      {id:195,label:'NY140/NY443',x:100,y:490},
+      // extra nodes for visual density
+      {id:1,label:'I-87@8',x:100,y:30},{id:2,label:'I-87@8A',x:85,y:15},
+      {id:7,label:'NY236@CR95',x:300,y:30},{id:8,label:'NY236/US9',x:240,y:50},
+      {id:10,label:'US9@CohCreRd',x:245,y:85},{id:11,label:'US9@VisFerRd',x:240,y:70},
+      {id:41,label:'I-87(7)/NY7',x:100,y:140},{id:43,label:'NY7/US9',x:160,y:150},
+      {id:100,label:'NY136/US4',x:380,y:320},{id:95,label:'NY32/NY378',x:330,y:300},
+      {id:59,label:'NY32/NY155',x:330,y:220},{id:70,label:'NY2/US9',x:185,y:170}
+    ],
+    edges:[
+      {u:0,v:18,road:'NY40',w:1.186},{u:18,v:33,road:'NY40',w:0.531},
+      {u:33,v:32,road:'NY40,NY142',w:0.1},{u:32,v:57,road:'NY40',w:0.6},
+      {u:57,v:49,road:'NY7',w:0.8},{u:49,v:47,road:'I-787,NY7',w:0.12},
+      {u:47,v:50,road:'I-787,NY7',w:0.35},{u:50,v:48,road:'I-787',w:0.2},
+      {u:48,v:92,road:'I-787',w:0.5},{u:92,v:91,road:'I-787',w:0.25},
+      {u:91,v:121,road:'I-787',w:0.55},{u:121,v:130,road:'I-90',w:0.45},
+      {u:130,v:153,road:'US9',w:0.4},{u:153,v:137,road:'US9W',w:0.42},
+      {u:137,v:151,road:'US9W',w:0.32},{u:151,v:150,road:'US9W,NY443',w:0.28},
+      {u:150,v:152,road:'US9W',w:0.31},{u:152,v:163,road:'NY443',w:0.38},
+      {u:163,v:195,road:'NY140,NY443',w:0.44},
+      // extra edges for visual
+      {u:1,v:41,road:'I-87',w:1.2},{u:41,v:43,road:'NY7',w:0.9},
+      {u:43,v:70,road:'US9',w:0.6},{u:70,v:153,road:'US9',w:2.1},
+      {u:7,v:8,road:'NY236',w:1.4},{u:8,v:10,road:'US9',w:0.5},
+      {u:10,v:11,road:'US9',w:0.4},{u:59,v:95,road:'NY32,NY378',w:0.8},
+      {u:95,v:92,road:'NY378',w:0.9},{u:100,v:95,road:'US4',w:0.7}
+    ],
+    path:[0,18,33,32,57,49,47,50,48,92,91,121,130,153,137,151,150,152,163,195],
+    source:0, target:195,
+    dijk:{dist:18.074,hops:19,visited:172},
+    astar:{dist:18.074,hops:19,visited:57},
+    simSteps:[
+      {edge:{u:0,v:18},road:'NY40',dist:null,delta:null,dVisited:null,aVisited:null,status:'DISCONNECTED'}
+    ],
+    crit:[
+      {road:'NY40',from:'NY40_N/NY142_S',to:'NY40@CR116',score:231000,disc:231},
+      {road:'NY40',from:'NY40@CR116',to:'NY40@FogRd',score:213000,disc:213},
+      {road:'US4,NY32',from:'NY32_Wat/US4_Wat',to:'NY32/US4@SchLn',score:40000,disc:40},
+      {road:'NY32',from:'NY32@CR52',to:'NY32/NY335',score:40000,disc:40},
+      {road:'US20',from:'NY146_W/US20_E',to:'NY155/US20',score:40000,disc:40},
+      {road:'US4,NY32',from:'NY32/US4@SchLn',to:'NY32/US4@LowNewRd',score:20000,disc:20},
+      {road:'NY236',from:'NY236/US9',to:'NY236@CR95',score:20000,disc:20},
+      {road:'NY150',from:'NY150@CR52',to:'NY43/NY150',score:20000,disc:20},
+      {road:'NY5',from:'NY5/NY32',to:'NY5@US9',score:20000,disc:20},
+      {road:'NY151',from:'NY151/US4',to:'NY151@CR53',score:20000,disc:20},
+      {road:'NY335',from:'NY335@FeuBushRd',to:'NY32/NY335',score:20000,disc:20},
+      {road:'NY7',from:'NY7/NY146',to:'I-890(9)/NY7',score:20000,disc:20},
+      {road:'US20,NY146',from:'NY146_E/US20_W',to:'NY146_W/US20_E',score:20000,disc:20},
+      {road:'NY32',from:'NY32@FeuBushRd',to:'NY32@CR52',score:20000,disc:20}
+    ]
+  }
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let currentGraph = 0;
+let currentPanel = 'graph';
+let currentView  = 'path';
+let showAllLabels = false;
+let animFrame = null;
+let removedEdgeIndices = [];
+
+// ─── Logging ──────────────────────────────────────────────────────────────────
+function log(msg, type='muted') {
+  const box = document.getElementById('logBox');
+  const d = document.createElement('div');
+  d.className = 'log-line ' + type;
+  const t = new Date().toLocaleTimeString('en',{hour12:false,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  d.textContent = '['+t+'] ' + msg;
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ─── Panel switching ──────────────────────────────────────────────────────────
+function switchPanel(name) {
+  document.querySelectorAll('.nav-item').forEach((n,i) => {
+    n.classList.toggle('active', ['graph','algo','failure','crit'][i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-'+name).classList.add('active');
+  currentPanel = name;
+  renderPanel(name);
+}
+
+function renderPanel(name) {
+  if (name==='graph')   drawGraph();
+  if (name==='algo')    renderAlgo();
+  if (name==='failure') renderFailure();
+  if (name==='crit')    renderCrit();
+}
+
+// ─── Graph selector ───────────────────────────────────────────────────────────
+function buildGraphButtons() {
+  const wrap = document.getElementById('graphButtons');
+  wrap.innerHTML = '';
+  GRAPHS.forEach((g,i) => {
+    const btn = document.createElement('button');
+    btn.className = 'graph-btn' + (i===currentGraph?' active':'');
+    btn.innerHTML = g.name+'<small>'+g.V+' vertices &middot; '+g.E+' edges</small>';
+    btn.onclick = () => selectGraph(i);
+    wrap.appendChild(btn);
+  });
+}
+
+function selectGraph(idx) {
+  currentGraph = idx;
+  removedEdgeIndices = [];
+  buildGraphButtons();
+  updateStatCards();
+  renderPanel(currentPanel);
+  log('loaded '+GRAPHS[idx].name, 'info');
+}
+
+function updateStatCards() {
+  const g = GRAPHS[currentGraph];
+  document.getElementById('graph-badge').textContent = g.name+' \u00B7 '+g.V+'V \u00B7 '+g.E+'E';
+  document.getElementById('path-badge').textContent = 'path: '+g.dijk.dist.toFixed(3)+'mi \u00B7 '+g.dijk.hops+' hops';
+  document.getElementById('stat-v').textContent = g.V;
+  document.getElementById('stat-e').textContent = g.E;
+  document.getElementById('stat-b').textContent = g.bridges;
+  const bpct = Math.round(g.bridges/g.E*100);
+  document.getElementById('bridge-pct').textContent = bpct+'%';
+  document.getElementById('bridge-bar').style.width = bpct+'%';
+  const eff = g.dijk.visited > 0 ? Math.round(100*(g.dijk.visited-g.astar.visited)/g.dijk.visited) : 0;
+  document.getElementById('stat-eff').textContent = eff+'%';
+  document.getElementById('stat-crit').textContent = g.crit[0]?.road || '—';
+  document.getElementById('stat-crit-sub').textContent = 'score: '+(g.crit[0]?.score>=1000?(g.crit[0].score/1000).toFixed(0)+'k':g.crit[0]?.score)+' \u00B7 '+g.crit[0]?.disc+' pairs disconnected';
+}
+
+// ─── Graph drawing ────────────────────────────────────────────────────────────
+function setView(v, el) {
+  currentView = v;
+  document.querySelectorAll('.toolbar-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const labels = {path:'showing shortest path',all:'all edges visible',crit:'critical edges highlighted',failure:'simulated failure state'};
+  document.getElementById('graph-desc').textContent = labels[v]||'';
+  drawGraph();
+}
+
+function toggleShowAllLabels() {
+  showAllLabels = !showAllLabels;
+  drawGraph();
+  log('labels '+(showAllLabels?'on':'off'), 'muted');
+}
+
+function drawGraph() {
+  const canvas = document.getElementById('netCanvas');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  const ctx = canvas.getContext('2d');
+  const g = GRAPHS[currentGraph];
+  const W = canvas.width, H = canvas.height;
+
+  // Scale vertices to canvas
+  const allX = g.vertices.map(v=>v.x), allY = g.vertices.map(v=>v.y);
+  const minX=Math.min(...allX), maxX=Math.max(...allX), minY=Math.min(...allY), maxY=Math.max(...allY);
+  const pad = 60;
+  const scaleX = v => pad + (v.x-minX)/(maxX-minX||1)*(W-2*pad);
+  const scaleY = v => pad + (v.y-minY)/(maxY-minY||1)*(H-2*pad);
+
+  const vmap = {};
+  g.vertices.forEach(v => { vmap[v.id] = v; });
+
+  ctx.fillStyle = '#111417';
+  ctx.fillRect(0,0,W,H);
+
+  const pathSet = new Set();
+  for (let i=0; i<g.path.length-1; i++) {
+    pathSet.add(g.path[i]+'-'+g.path[i+1]);
+    pathSet.add(g.path[i+1]+'-'+g.path[i]);
+  }
+
+  const critEdgeSet = new Set(g.crit.slice(0,5).map(c=>c.from+'|'+c.to));
+
+  g.edges.forEach((e,idx) => {
+    const u=vmap[e.u], v=vmap[e.v];
+    if (!u||!v) return;
+    const removed = removedEdgeIndices.includes(idx);
+    const onPath = pathSet.has(e.u+'-'+e.v);
+    const isCrit = currentView==='crit' && (critEdgeSet.has(u.label+'|'+v.label)||critEdgeSet.has(v.label+'|'+u.label));
+
+    if (removed && currentView==='failure') return;
+
+    ctx.beginPath();
+    ctx.moveTo(scaleX(u), scaleY(u));
+    ctx.lineTo(scaleX(v), scaleY(v));
+
+    if (removed) {
+      ctx.strokeStyle = 'rgba(248,113,113,0.15)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]);
+    } else if (currentView==='path' && onPath) {
+      ctx.strokeStyle = '#4ade80';
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([]);
+    } else if (isCrit) {
+      ctx.strokeStyle = 'rgba(248,113,113,0.7)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = '#2a3038';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // edge weight label on path
+    if (currentView==='path' && onPath && g.V<=20) {
+      const mx=(scaleX(u)+scaleX(v))/2, my=(scaleY(u)+scaleY(v))/2;
+      ctx.fillStyle='rgba(74,222,128,0.7)';
+      ctx.font='9px DM Mono,monospace';
+      ctx.fillText(e.w.toFixed(2)+'mi', mx+4, my-3);
+    }
+  });
+
+  // Nodes
+  g.vertices.forEach(v => {
+    const x=scaleX(v), y=scaleY(v);
+    const onPath = g.path.includes(v.id);
+    const isSource = v.id===g.source;
+    const isTarget = v.id===g.target;
+    const r = isSource||isTarget ? 7 : onPath ? 5 : 3.5;
+
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle = isSource||isTarget ? '#4ade80' : onPath ? '#22d3ee' : '#2a3038';
+    ctx.fill();
+    if (isSource||isTarget) {
+      ctx.strokeStyle='rgba(74,222,128,0.4)';
+      ctx.lineWidth=3;
+      ctx.stroke();
+    }
+
+    // Labels
+    if (showAllLabels || onPath || isSource || isTarget) {
+      ctx.fillStyle = isSource||isTarget ? '#4ade80' : onPath ? '#22d3ee' : '#5a6370';
+      ctx.font = (isSource||isTarget?'500 ':'')+'10px DM Mono,monospace';
+      const lbl = v.label.split('@')[0].split('/')[0].replace('NY','').replace('US','US').substring(0,8);
+      ctx.fillText(lbl, x+9, y+4);
+    }
+  });
+
+  // Source/target labels
+  [g.source, g.target].forEach((id,i) => {
+    const v = vmap[id];
+    if (!v) return;
+    ctx.fillStyle = '#4ade80';
+    ctx.font = '500 11px DM Sans,sans-serif';
+    ctx.fillText((i===0?'▶ Source: ':'◀ Target: ')+v.label, 10, 18+i*18);
+  });
+}
+
+// ─── Algorithm panel ─────────────────────────────────────────────────────────
+function renderAlgo() {
+  const g = GRAPHS[currentGraph];
+  document.getElementById('algo-graph-label').textContent = g.name;
+  document.getElementById('d-dist').textContent = g.dijk.dist.toFixed(3)+' mi';
+  document.getElementById('d-hops').textContent = g.dijk.hops;
+  document.getElementById('d-visited').textContent = g.dijk.visited;
+  document.getElementById('a-dist').textContent = g.astar.dist.toFixed(3)+' mi';
+  document.getElementById('a-hops').textContent = g.astar.hops;
+  document.getElementById('a-visited').textContent = g.astar.visited;
+
+  const eff = g.dijk.visited>0 ? Math.round(100*(g.dijk.visited-g.astar.visited)/g.dijk.visited) : 0;
+  document.getElementById('eff-bar').style.width = eff+'%';
+  document.getElementById('eff-pct').textContent = eff+'%';
+  document.getElementById('astar-tag').textContent = eff>0 ? eff+'% faster' : 'same speed';
+  document.getElementById('eff-note').textContent = eff>0
+    ? 'A* explored '+eff+'% fewer nodes on '+g.name+' ('+g.astar.visited+' vs '+g.dijk.visited+')'
+    : 'A* and Dijkstra performed identically on this small graph';
+
+  // Path display
+  const pd = document.getElementById('path-display');
+  const vmap = {};
+  g.vertices.forEach(v=>vmap[v.id]=v);
+  pd.innerHTML = '';
+  g.path.forEach((nid,i)=>{
+    const v=vmap[nid];
+    const sp=document.createElement('span');
+    sp.className='path-node';
+    sp.title=v?v.label:'vertex '+nid;
+    sp.textContent=(v?v.label.split('@')[0].split('/')[0]:'?')+'#'+nid;
+    pd.appendChild(sp);
+    if(i<g.path.length-1){const a=document.createElement('span');a.className='path-arrow';a.textContent='→';pd.appendChild(a);}
+  });
+
+  // Failure degradation rows
+  const rows=document.getElementById('failure-algo-rows');
+  rows.innerHTML='<div style="font-size:11px;color:var(--text3)">Baseline: '+g.dijk.visited+' (D) vs '+g.astar.visited+' (A*) nodes visited</div>';
+  g.simSteps.forEach((s,i)=>{
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;justify-content:space-between;font-size:11px;font-family:var(--mono);color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border)';
+    div.innerHTML='<span style="color:var(--accent3)">step '+(i+1)+' ('+s.road+')</span><span>'+(s.status==='DISCONNECTED'?'<span style="color:var(--accent4)">disconnected</span>':'D:'+s.dVisited+' A*:'+s.aVisited)+'</span>';
+    rows.appendChild(div);
+  });
+}
+
+// ─── Failure panel ────────────────────────────────────────────────────────────
+function renderFailure() {
+  const g = GRAPHS[currentGraph];
+  const slider = document.getElementById('simSlider');
+  slider.max = g.simSteps.length;
+  slider.value = 0;
+  updateSim(0);
+  drawFailChart();
+  document.getElementById('failure-insight').innerHTML =
+    '<span style="color:var(--accent3);font-family:var(--mono);font-size:10px;letter-spacing:0.8px">INSIGHT</span><br>' +
+    (g.simSteps[0]?.status==='DISCONNECTED'
+      ? 'Removing the first edge (<strong style="color:var(--accent3)">'+g.simSteps[0].road+'</strong>) immediately disconnects the network — this road is a bridge with no alternative route.'
+      : 'The network degrades gradually. Watch how path distance increases with each removal.');
+}
+
+function updateSim(step) {
+  step = parseInt(step);
+  document.getElementById('simStepVal').textContent = step===0?'baseline':'step '+step;
+  const g = GRAPHS[currentGraph];
+  const tbody = document.getElementById('simTbody');
+  let html = '<tr class="row-baseline"><td class="mono" style="color:var(--text3)">—</td><td class="mono" colspan="2" style="color:var(--text3)">baseline (intact)</td><td class="mono">'+g.dijk.dist.toFixed(3)+' mi</td><td class="mono" style="color:var(--text3)">+0.000</td><td class="mono">'+g.astar.visited+'</td><td class="mono">'+g.dijk.visited+'</td><td><span class="tag-ok">OK</span></td></tr>';
+
+  for (let i=0; i<Math.min(step,g.simSteps.length); i++) {
+    const s = g.simSteps[i];
+    const cls = i===step-1 ? 'row-current' : (s.status==='DISCONNECTED'?'row-disc':'row-ok');
+    html += '<tr class="'+cls+'"><td class="mono">'+(i+1)+'</td><td class="mono" style="color:var(--accent3)">'+s.road+'</td><td class="mono" style="color:var(--text3);font-size:10px">('+s.edge.u+'↔'+s.edge.v+')</td>';
+    html += s.status==='DISCONNECTED'
+      ? '<td class="mono" style="color:var(--accent4)">N/A</td><td class="mono" style="color:var(--accent4)">∞</td><td class="mono">—</td><td class="mono">—</td><td><span class="tag-disc">DISCONNECTED</span></td>'
+      : '<td class="mono">'+s.dist.toFixed(3)+' mi</td><td class="mono" style="color:var(--accent3)">+'+s.delta.toFixed(3)+'</td><td class="mono">'+s.aVisited+'</td><td class="mono">'+s.dVisited+'</td><td><span class="tag-ok">OK</span></td>';
+    html += '</tr>';
+  }
+  tbody.innerHTML = html;
+
+  // update removed edges for graph view
+  removedEdgeIndices = [];
+  const g2 = GRAPHS[currentGraph];
+  for (let i=0; i<step && i<g2.simSteps.length; i++) {
+    const s=g2.simSteps[i];
+    const idx=g2.edges.findIndex(e=>(e.u===s.edge.u&&e.v===s.edge.v)||(e.u===s.edge.v&&e.v===s.edge.u));
+    if(idx>=0) removedEdgeIndices.push(idx);
+  }
+  if(currentPanel==='graph') drawGraph();
+}
+
+function drawFailChart() {
+  const canvas = document.getElementById('failCanvas');
+  canvas.width = canvas.parentElement.clientWidth - 28;
+  const ctx = canvas.getContext('2d');
+  const g = GRAPHS[currentGraph];
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  const labels=['Baseline',...g.simSteps.map((_,i)=>'S'+(i+1))];
+  const vals=[0,...g.simSteps.map(s=>s.status==='DISCONNECTED'?null:s.delta)];
+  const n=labels.length;
+  const bw=Math.max(16,Math.min(50,(W-50)/n*0.6));
+  const gap=(W-50)/n;
+  const maxV=Math.max(...vals.filter(v=>v!==null),5);
+
+  labels.forEach((label,i) => {
+    const x=30+i*gap+(gap-bw)/2;
+    const v=vals[i];
+    if(v===null){
+      ctx.fillStyle='rgba(248,113,113,0.18)';
+      ctx.fillRect(x,6,bw,H-26);
+      ctx.fillStyle='#f87171';
+      ctx.font='10px DM Mono,monospace';
+      ctx.textAlign='center';
+      ctx.fillText('∞',x+bw/2,H-28);
+    } else {
+      const bh=Math.max(2,(v/maxV)*(H-26));
+      ctx.fillStyle=i===0?'rgba(74,222,128,0.15)':'rgba(245,158,11,0.4)';
+      ctx.strokeStyle=i===0?'rgba(74,222,128,0.4)':'rgba(245,158,11,0.6)';
+      ctx.lineWidth=0.5;
+      ctx.fillRect(x,H-26-bh,bw,bh);
+      ctx.strokeRect(x,H-26-bh,bw,bh);
+      if(v>0){ctx.fillStyle='var(--accent3)';ctx.font='9px DM Mono,monospace';ctx.textAlign='center';ctx.fillText('+'+v.toFixed(2),x+bw/2,H-30-bh);}
+    }
+    ctx.fillStyle='#5a6370';
+    ctx.font='9px DM Mono,monospace';
+    ctx.textAlign='center';
+    ctx.fillText(label,x+bw/2,H-8);
+  });
+  // axes
+  ctx.strokeStyle='#2a3038';ctx.lineWidth=0.5;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(28,0);ctx.lineTo(28,H-20);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(28,H-20);ctx.lineTo(W,H-20);ctx.stroke();
+}
+
+// ─── Criticality panel ───────────────────────────────────────────────────────
+function renderCrit() {
+  const g = GRAPHS[currentGraph];
+  document.getElementById('crit-label').textContent = g.name+' \u00B7 '+g.crit.length+' edges scored';
+  const maxScore = g.crit[0]?.score||1;
+
+  document.getElementById('critList').innerHTML = g.crit.map((c,i) => {
+    const pct = Math.round(c.score/maxScore*100);
+    const color = i<2?'var(--accent4)':i<5?'var(--accent3)':'var(--accent2)';
+    return `<div class="crit-item" title="${c.from} ↔ ${c.to}">
+      <span class="crit-rank">${i+1}</span>
+      <span class="crit-road" style="color:${i<2?'var(--accent4)':i<5?'var(--accent3)':'var(--accent3)'}">${c.road}</span>
+      <div class="crit-bar-bg"><div class="crit-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+      <span class="crit-score">${c.score>=1000?(c.score/1000).toFixed(0)+'k':c.score}</span>
+      <span class="crit-disc">${c.disc}×</span>
+    </div>`;
+  }).join('');
+
+  const bridges = g.crit.filter(c=>c.disc>0);
+  document.getElementById('bridge-desc').textContent =
+    bridges.length+' bridge edges found in '+g.name+'. Each disconnects isolated vertex pairs when removed.';
+  document.getElementById('bridge-list').innerHTML = bridges.map(c =>
+    `<div class="bridge-row"><span style="color:var(--accent3)">${c.road}</span><span>${c.from.split('@')[0]} ↔ ${c.to.split('@')[0]}</span><span style="color:var(--accent4)">${c.disc}×</span></div>`
+  ).join('');
+}
+
+// ─── Edge removal animation ───────────────────────────────────────────────────
+function animateEdgeRemoval() {
+  const g = GRAPHS[currentGraph];
+  if (currentPanel !== 'graph') { switchPanel('graph'); }
+  setView('failure', document.getElementById('btn-failure'));
+  removedEdgeIndices = [];
+  let step = 0;
+  log('animating edge removal sequence', 'warn');
+  function next() {
+    if (step >= g.simSteps.length) { log('animation complete', 'ok'); return; }
+    const s = g.simSteps[step];
+    const idx = g.edges.findIndex(e=>(e.u===s.edge.u&&e.v===s.edge.v)||(e.u===s.edge.v&&e.v===s.edge.u));
+    if(idx>=0) removedEdgeIndices.push(idx);
+    drawGraph();
+    log('removed edge: '+s.road+' ('+s.edge.u+'↔'+s.edge.v+')', s.status==='DISCONNECTED'?'err':'warn');
+    step++;
+    animFrame = setTimeout(next, 900);
+  }
+  clearTimeout(animFrame);
+  next();
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+function exportResults() {
+  const g = GRAPHS[currentGraph];
+  const lines = [
+    'NETWORK RESILIENCE ANALYSIS — '+g.name.toUpperCase(),
+    'CSIS 385 — Donnelly & Majtyka — Spring 2026',
+    '='.repeat(60),
+    '',
+    'GRAPH: '+g.V+' vertices, '+g.E+' edges',
+    '',
+    'DIJKSTRA: '+g.dijk.dist.toFixed(3)+' mi, '+g.dijk.hops+' hops, '+g.dijk.visited+' nodes visited',
+    'A*:       '+g.astar.dist.toFixed(3)+' mi, '+g.astar.hops+' hops, '+g.astar.visited+' nodes visited',
+    'A* efficiency: '+Math.round(100*(g.dijk.visited-g.astar.visited)/Math.max(1,g.dijk.visited))+'% fewer nodes',
+    '',
+    'CRITICALITY RANKING:',
+    ...g.crit.map((c,i)=>'  '+(i+1)+'. '+c.road+' (score:'+c.score+', disconnects:'+c.disc+')'),
+    '',
+    'BRIDGE EDGES: '+g.bridges,
+  ];
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = g.name+'-results.txt';
+  a.click();
+  log('exported '+g.name+' results', 'ok');
+}
+
+// ─── Add graph modal ──────────────────────────────────────────────────────────
+function openModal() { document.getElementById('modalBg').classList.add('open'); }
+function closeModal() { document.getElementById('modalBg').classList.remove('open'); }
+
+function parseAndAddGraph() {
+  const name = document.getElementById('modalName').value.trim() || 'graph-'+GRAPHS.length;
+  const output = document.getElementById('modalOutput').value;
+  const status = document.getElementById('modal-status');
+
+  // Parse key values from Java output
+  const Vmatch = output.match(/Graph\((\d+) vertices/);
+  const Ematch = output.match(/(\d+) edges\)/);
+  const distMatch = output.match(/Distance\s*:\s*([\d.]+)/);
+  const hopsMatch = output.match(/Hops\s*:\s*(\d+)/);
+  const visitedMatches = [...output.matchAll(/Visited\s*:\s*(\d+)/g)];
+  const bridgeMatch = output.match(/Bridge Edges.*?(\d+)\s*\n/);
+
+  if (!Vmatch || !distMatch) {
+    status.textContent = 'Could not parse output. Make sure you paste the full Java output.';
+    status.style.color = 'var(--accent4)';
+    return;
+  }
+
+  const V = parseInt(Vmatch[1]);
+  const E = Ematch ? parseInt(Ematch[1]) : 0;
+  const dist = parseFloat(distMatch[1]);
+  const hops = hopsMatch ? parseInt(hopsMatch[1]) : 0;
+  const dVisited = visitedMatches[0] ? parseInt(visitedMatches[0][1]) : 0;
+  const aVisited = visitedMatches[1] ? parseInt(visitedMatches[1][1]) : dVisited;
+  const bridges = bridgeMatch ? parseInt(bridgeMatch[1]) : 0;
+
+  // Parse path
+  const pathMatch = output.match(/Path\s*:\s*\[([^\]]+)\]/);
+  const path = pathMatch ? pathMatch[1].split(',').map(s=>parseInt(s.trim())) : [0,V-1];
+
+  // Parse crit edges
+  const critRows = [...output.matchAll(/\d+\s+([\w,]+)\s+[\w@*\/]+\s+[\w@*\/]+\s+[\d.]+\s+([\d.]+)\s+(\d+)/g)];
+  const crit = critRows.slice(0,15).map(m=>({
+    road:m[1], from:'—', to:'—', score:parseFloat(m[2]), disc:parseInt(m[3])
+  }));
+
+  // Build minimal graph
+  const newGraph = {
+    name, V, E, bridges,
+    vertices: path.map((id,i)=>({id,label:'V'+id,x:50+i*(450/Math.max(path.length-1,1)),y:240})),
+    edges: path.slice(0,-1).map((u,i)=>({u,v:path[i+1],road:'road',w:0.5})),
+    path, source:path[0], target:path[path.length-1],
+    dijk:{dist,hops,visited:dVisited},
+    astar:{dist,hops,visited:aVisited},
+    simSteps:[], crit
+  };
+
+  GRAPHS.push(newGraph);
+  buildGraphButtons();
+  selectGraph(GRAPHS.length-1);
+  closeModal();
+  log('added '+name+': '+V+'V '+E+'E', 'ok');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildGraphButtons();
+selectGraph(0);
+log('dashboard initialized', 'info');
+log('siena-2mi loaded: 8V 6E', 'ok');
+log('siena-10mi loaded: 196V 240E', 'ok');
+log('dijkstra baseline: 4.953mi', 'ok');
+log('a* efficiency: 66.9% (10mi graph)', 'ok');
+
+window.addEventListener('resize', ()=>{ if(currentPanel==='graph') drawGraph(); });
+document.getElementById('modalBg').addEventListener('click', function(e){ if(e.target===this) closeModal(); });
+</script>
+</body>
+</html>
